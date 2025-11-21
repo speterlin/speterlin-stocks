@@ -11,14 +11,11 @@ dependencies = [
     "pandas>=2.0",
     "numpy",
     "requests>=2.20",
-    "json",
     "datetime",
     "beautifulsoup4", # bs4
-    "re",
     "openai", # ~
     "langchain", # ~
     "google",
-    "time",
     "unidecode",
     "fake_headers",
     "random",
