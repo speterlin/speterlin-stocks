@@ -25,6 +25,3 @@ htmlcov/
 # Editors
 .vscode/
 .idea/
-
-# Deleted code
-deleted/
