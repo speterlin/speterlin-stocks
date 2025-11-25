@@ -4,6 +4,6 @@
 
 """
 
-__version__ = '0.1.3'
+__version__ = '0.1.4'
 
-from .module1 import .
+from .module1 import *

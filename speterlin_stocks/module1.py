@@ -1,4 +1,86 @@
-import pandas as pd
+__all__ = [
+    "_fetch_data",
+    "trendline",
+    # "get_zacks_data",
+    "get_ticker_data_quote_fmp",
+    "get_ticker_data_granular_fmp",
+    "get_ticker_data_fmp",
+    "get_ticker_balance_sheet_data_fmp",
+    "get_ticker_stock_news_articles_fmp",
+    "get_daily_stock_gainers_fmp",
+    "tickers_with_stock_splits_in_85_days_period_fmp",
+    "tickers_with_stock_splits_in_period_fmp",
+    # "get_etf_constituents_fmp"
+    "get_senate_trading_symbol_fmp",
+    # "get_ticker_data_yf"
+    # "get_exchange_rates_exchangerate"
+    # "get_ticker_data_detailed_gfinance"
+    # "get_ticker_data_detailed_yfinance"
+    # "openai_functions", # array of functions
+    "get_investment_recommendation",
+    "get_investment_recommendation_2",
+    # "should_I_buy_the_stock_openai"
+    "should_I_buy_the_stock_google_gemini_pro",
+    "get_google_trends", # replaces "get_cryptory",
+    "get_saved_tickers_data",
+    # "save_usa_by_tv_tickers_zr_data"
+    "save_tickers_ms_zr_data",
+    "save_tickers_gainers_data",
+    "save_usa_alpaca_by_fmp_tickers_ms_zr_data",
+    # "crunchbase_search_permalinks",
+    # "crunchbase_check_ticker_and_permalink"
+    # "get_crunchbase_user_data_for_ticker"
+    "alpaca_trade_ticker",
+    "get_alpaca_assets",
+    "fmp_check_24h_vol",
+    "update_portfolio_postions_back_testing",
+    "update_portfolio_buy_and_sell_tickers",
+    # "tickers_with_stock_splits_in_day_yfinance",
+    # "tickers_with_stock_splits_in_period_yfinance",
+    "get_sp500_ranked_tickers_by_marketbeat",
+    "run_portfolio",
+    "run_portfolio_zr",
+    "run_portfolio_rr",
+    "run_portfolio_tilupccu",
+    "run_portfolio_mmtv",
+    "run_portfolio_random_sp500",
+    "run_portfolio_mm",
+    "run_portfolio_ai_recommendations",
+    "run_portfolio_top_n_gainers_ai_analysis",
+    "get_senate_timestamps_and_tickers_inflows_and_outflows_by_month_for_stocks",
+    "run_portfolio_senate_trading",
+    "run_portfolio_sma_mm",
+    "portfolio_align_prices_with_alpaca",
+    "portfolio_align_buying_power_with_alpaca",
+    "portfolio_calculate_roi",
+    "sleep_until_30_min",
+    "portfolio_panic_sell",
+    "retry_alpaca_open_orders_in_portfolio",
+    "retry_atrade_error_or_paper_orders_in_portfolio",
+    "portfolio_trading",
+    "save_portfolio_backup",
+    "get_saved_portfolio_backup",
+]
+
+import requests
+import time
+
+# ~same as in eventregistry/quant-trading/crypto.py # maybe refactor name to _fetch_or_push_data, pushing data is unique for when sending orders to exchange so probably not that important
+# need to have ndg-httpsclient, pyopenssl, and pyasn1 (latter 2 are normally already installed) installed to deal with Caused by SSLError(SSLError("bad handshake: SysCallError(60, 'ETIMEDOUT')",),) according to https://stackoverflow.com/questions/33410577 (should also check tls_version and maybe unset https_proxy from commandline), but doesn't seem to work (might also be because requests removed 3DES from default cipher suite list: github.com/psf/requests/issues/4193), but error is escaped when fetching zacks data (so far only issue is with yahoo finance - maybe because yahoo finance api has a 2,000 API calls per hour limit)
+def _fetch_data(func, params, error_str, empty_data, retry=True):
+    try:
+        data = func(**params)
+    except (ValueError, TypeError) as e:
+        print(str(e) + error_str)
+        data = empty_data
+    except Exception as e:
+        print(str(e) + error_str)
+        data = empty_data
+        if retry and ((type(e) in [UnboundLocalError, TimeoutError, RuntimeError, requests.exceptions.ConnectionError, requests.exceptions.TooManyRedirects]) or (type(e) is requests.exceptions.HTTPError and e.response.status_code == 429)): # UnboundLocalError because of response error (local variable 'response' referenced before assignment), if use urllib for request TimeoutError is urllib.error.URLError: <urlopen error [Errno 60] Operation timed out>, requests.exceptions.ConnectionError is for (even when not using urllib): NewConnectionError('<urllib3.connection.VerifiedHTTPSConnection object at 0x119429240>: Failed to establish a new connection: [Errno 60] Operation timed out and: requests.exceptions.ConnectionError: ('Connection aborted.', OSError("(54, 'ECONNRESET')",)), currently unresolved - (even when not using urllib): Max retries exceeded with url: /?t=PD (Caused by OpenSSL.SSL.SysCallError/SSLError(SSLError("bad handshake: SysCallError(50/54/60, 'ENETDOWN'/'ETIMEDOUT'/'ECONNRESET')",)
+            time.sleep(60) # CoinGecko has limit of 100 requests/minute therefore sleep for a minute, unsure of request limit for Google Trends
+            data = _fetch_data(func, params, error_str, empty_data, retry=False)
+    return data
+
 import numpy as np
 
 # data is dataframe column series, same as in crypto.py
@@ -8,8 +90,6 @@ def trendline(data, order=1, reverse_to_ascending=False):
     slope = coeffs[-2]
     return float(slope)
 
-import requests
-
 def get_zacks_data(ticker=None):
     # zacks rank, can also do motley fool, found from github.com/janlukasschroeder/zacks-api
     # proxies = {'http':'http://localhost:port','https':'http://localhost:port'}
@@ -18,6 +98,7 @@ def get_zacks_data(ticker=None):
     data = resp.json()
     return data
 
+import pandas as pd
 import json
 from datetime import datetime, timedelta
 
@@ -169,16 +250,16 @@ def get_senate_trading_symbol_fmp(ticker):
 import yfinance as yf
 
 # refactor to get rid of verbose
-def get_ticker_data(ticker, start_datetime=None, end_datetime=None, interval="1d"):
+def get_ticker_data_yf(ticker, start_datetime=None, end_datetime=None, interval="1d"):
     data = yf.download(ticker, start_datetime, end_datetime, interval=interval) # OHLC, adj close, volume
     return data
 
 import bs4 as bs
 import re
 
-def get_exchange_rates_usd():
+def get_exchange_rates_exchangerate(base_currency="USD"):
     headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10 7 4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'} #
-    site_url = 'https://api.exchangerate-api.com/v4/latest/USD'
+    site_url = 'https://api.exchangerate-api.com/v4/latest/' + base_currency
     resp = requests.get(site_url, headers=headers) #
     # if resp.status_code == 200:
     resp_in_json = resp.json()
@@ -227,7 +308,7 @@ def get_ticker_data_detailed_gfinance(ticker, exchange):
     data['EPS (TTM)'] = (1 / data['P/E ratio']) * last if 'P/E ratio' in data else float("NaN") # P/E is using TTM assuming it's basic earnings
     return data
 
-def get_ticker_data_detailed(ticker, options={'engaged': False, 'type': 'key-statistics'}, additional_page={'engaged': False, 'type': 'profile'}): # maybe refactor to incorporate multiple options # 'financials' # financial options doesn't include 'summaryProfile', 'defaultKeyStatistics', 'financialData'
+def get_ticker_data_detailed_yfinance(ticker, options={'engaged': False, 'type': 'key-statistics'}, additional_page={'engaged': False, 'type': 'profile'}): # maybe refactor to incorporate multiple options # 'financials' # financial options doesn't include 'summaryProfile', 'defaultKeyStatistics', 'financialData'
     headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10 7 4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'} # {'User-Agent': 'Mozilla/4.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'} # maybe refactor here and below, might change header to something else but doesn't matter just tricking the server (fighting bots / crawlers) into thinking it's a browser making the request, header is from https://stackoverflow.com/questions/68259148/getting-404-error-for-certain-stocks-and-pages-on-yahoo-finance-python
     site_url = 'https://finance.yahoo.com/quote/' + ticker + '/' + (options['type'] if options['engaged'] else '') # https://finance.yahoo.com/quote/TSLA/key-statistics?p=TSLA&.tsrc=fin-srch
     resp = requests.get(site_url, headers=headers) # , auth=(username, password)) # maybe add timeout=50 to avoid unsolved_error (see requests documentation)
@@ -350,7 +431,7 @@ def get_investment_recommendation_2(analysis, ticker):
     # rating = google_gemini_pro_model.generate_content(f"Given the Google Gemini Pro analysis, what is the numeric investment recommendation on a scale of 1-10 of the company stock ticker ?: {analysis.text}?")
     return rating
 
-def get_investment_recommendation_openai(analysis): # , ai="google-gemini-pro"
+def should_I_buy_the_stock_openai (analysis): # get_investment_recommendation_openai # , ai="google-gemini-pro"
     response = openai_client.chat.completions.create( # openai.ChatCompletion.create(
         model="gpt-4", # 3.5-turbo
         temperature=0,
@@ -368,8 +449,6 @@ def get_investment_recommendation_openai(analysis): # , ai="google-gemini-pro"
     print(investment_recommendation + " - " + str(tokens_used))
     investment_recommendation = float(investment_recommendation) # if not re.search(r"/", investment_recommendation) else float(investment_recommendation.split("/"))
     return investment_recommendation, tokens_used
-
-import time
 
 def should_I_buy_the_stock_google_gemini_pro(ticker, company_name, location=None, add_technical=False): # query # , ai="google-gemini-pro"
     # agent.run(query) Outputs Company name, Ticker
@@ -405,33 +484,30 @@ def should_I_buy_the_stock_google_gemini_pro(ticker, company_name, location=None
     print("Execution time: " + str(time.time() - start_time))
     return analysis
 
-from cryptory import Cryptory
+from pytrends.request import TrendReq
 
-# same as in crypto.py
-def get_cryptory(my_cryptory, data_type, params):
-    if data_type == 'google_trends':
-        data = my_cryptory.get_google_trends(**params) # 2 day lag if my_cryptory to_date is current day
-    if data_type == 'reddit_subscribers':
-        data = my_cryptory.extract_reddit_metrics(**params) # 1 day lag if my_cryptory to_date is current day
-    return data
-
-# ~same as in eventregistry/quant-trading/crypto.py # maybe refactor name to _fetch_or_push_data, pushing data is unique for when sending orders to exchange so probably not that important
-# need to have ndg-httpsclient, pyopenssl, and pyasn1 (latter 2 are normally already installed) installed to deal with Caused by SSLError(SSLError("bad handshake: SysCallError(60, 'ETIMEDOUT')",),) according to https://stackoverflow.com/questions/33410577 (should also check tls_version and maybe unset https_proxy from commandline), but doesn't seem to work (might also be because requests removed 3DES from default cipher suite list: github.com/psf/requests/issues/4193), but error is escaped when fetching zacks data (so far only issue is with yahoo finance - maybe because yahoo finance api has a 2,000 API calls per hour limit)
-def _fetch_data(func, params, error_str, empty_data, retry=True):
+def get_google_trends(kw_list, from_date, to_date, trend_days=270, cat=0, geo='', tz=480, gprop='', hl='en-US', isPartial_col=False, from_start=False, scale_cols=True): # trend_days max is around 270 # category to narrow results # geo e.g 'US', 'UK' # tz = timezone offset default is 360 which is US CST (UTC-6), PST is 480 (assuming UTC-8*60) # hl language default is en-US # gprop : filter results to specific google property like 'images', 'news', 'youtube' or 'froogle' # overlap=100, sleeptime=1, not doing multiple searches # other variables: timeout=(10,25), proxies=['https://34.203.233.13:80',], retries=2, backoff_factor=0.1, requests_args={'verify':False}
+    data = pd.DataFrame()
+    if len(kw_list) != 1: # not doing multirange_interest_over_time: len(kw_list)==0 or len(kw_list)>5
+        print("Error: The keyword list must be 1, not doing multirange_interest_over_time") # be > 0 and can contain at most 5 words
+        return data
+    n_days = (to_date - from_date).days
+    if n_days>270 or trend_days>270:
+        print("Error: To - From Dates or Trend days must not exceed 270")
+        return data
+    # not verifying from_date, to_date types
+    _pytrends = TrendReq(hl=hl, tz=tz)
+    # pytrends.build_payload(kw_list, cat=0, timeframe=, geo='', gprop='')
     try:
-        data = func(**params)
-    except (ValueError, TypeError) as e:
-        print(str(e) + error_str)
-        data = empty_data
+        _pytrends.build_payload(kw_list, cat=cat, timeframe=[from_date.strftime('%Y-%m-%d') + ' ' + to_date.strftime('%Y-%m-%d')], geo=geo, gprop=gprop) # trend_dates[0]
     except Exception as e:
-        print(str(e) + error_str)
-        data = empty_data
-        if retry and ((type(e) in [UnboundLocalError, TimeoutError, RuntimeError, requests.exceptions.ConnectionError, requests.exceptions.TooManyRedirects]) or (type(e) is requests.exceptions.HTTPError and e.response.status_code == 429)): # UnboundLocalError because of response error (local variable 'response' referenced before assignment), if use urllib for request TimeoutError is urllib.error.URLError: <urlopen error [Errno 60] Operation timed out>, requests.exceptions.ConnectionError is for (even when not using urllib): NewConnectionError('<urllib3.connection.VerifiedHTTPSConnection object at 0x119429240>: Failed to establish a new connection: [Errno 60] Operation timed out and: requests.exceptions.ConnectionError: ('Connection aborted.', OSError("(54, 'ECONNRESET')",)), currently unresolved - (even when not using urllib): Max retries exceeded with url: /?t=PD (Caused by OpenSSL.SSL.SysCallError/SSLError(SSLError("bad handshake: SysCallError(50/54/60, 'ENETDOWN'/'ETIMEDOUT'/'ECONNRESET')",)
-            time.sleep(60) # CoinGecko has limit of 100 requests/minute therefore sleep for a minute, unsure of request limit for Google Trends
-            data = _fetch_data(func, params, error_str, empty_data, retry=False)
+        print(str(e) + " - No (or issue with) Pytrends for kw_list: " + str(kw_list) + " with from_date: " + str(from_date) + " and to_date: " + str(to_date))
+    data = _pytrends.interest_over_time().reset_index()
+    if not isPartial_col:
+        data.drop('isPartial', axis=1, inplace=True)
     return data
 
-# 04/24/2020 is first day with S&P 500 data (505 tickers) with Zacks Rank ordered alphabetically from Slickcharts (I believe), 04/28/2020 is first day with S&P 500 data (505 tickers) with Zacks Rank ordered by S&P 500 rank from Slickcharts, 05/08/2020 is first day with USA-listed stocks data (~4900 tickers) with Zacks Rank ordered by Market Cap Rank from TradingView, 07/21/2020 is first day with USA-listed tradable assets on Alpaca data (~6900 tickers) with Morningstar and Zacks Rank ordered by Alpaca from Yahoo Finance # some other nuances (like TradingView v2 data, incomplete Yahoo Finance data up until 07/24/2020, modifications/additions to Yahoo Finance data up until 08/07/2020), 10/16/2020 is first day with 'P/S (TTM)', 'EV' data, 10/30/2020 is first day with 'D/E (MRQ)', 05/13/2021 is first day with 'Forward P/E', 06/04/2021 is first day with 'P/E (TTM)' (could be derived in previous days) # 2020-05-18 is without zacks rank, issue, 2020-06-16 is a txt document with comma-seperated values but without zacks rank, 2020-10-30 and 2020-11-(02->05) missed a lot of tickers (~2325) since improper implementation of ticker_data_detailed['financialData'] (any ticker that has incomplete ticker_data_detailed['financialData'] is not recorded), 2020-07-21->2020-12-08 missed a lot of tickers (~400/day) since improper implementation of ticker_data_detailed['summaryDetail'], 10/30/2020->2021-01-05 missed some tickers (~10/day) since improper implementation of ticker_data_detailed['financialData'], 2020-12-02 and 2020-12-23 failed to save data due to requests error (2020-12-23 not sure) and 2021-03-02 saved late due to frozen Q all tickers after and including S have data from 2021-03-03 06:30 - 07:50, 2021-04-06->08 and 2021-07-07->08 no data downloaded because trips with Stephanie some reason not working, 2021-07-01->12 issue with anti-automation system (only downloaded 1/2 of tickers) fixed by adding header to fake as browser, 2021-09-08 frozen, 2021-10-04->06 frozen while on trip with Maja in Miami, 2021-10-19 wrote over when trying to download and save 2021-10-29 data, 2021-10-29 -> 2021-11-01 bad / duplicate (of 2021-10-28) data , 2021-11-04 froze, 2021-12-23->2022-01-03 & 2022-01-10->13 duplicate (at least the important) data, 2022-01-18 data is a bit corrupted since late save (mixed with 2022-01-19 06:30->09:22am data), 2022-01-26 & 2022-03-10 frozen, 2022-05-20->26 duplicate, 2022-10-31+ weird stuff happening with time.sleep() (sleeping for many minutes / hours at a time) & downloading (download pausing for hours at a time, taking 5x as long etc) and saving data (like save_portfolio_backup() saving to save_tickers_ms_zr_data() location) with new Apple update (Mac OS 12.6.1) even after restarting etc, 2022-12-16->2022-12-29 yfinance updated their page so get_ticker_data_detailed() doesn't pull the necessary data, 2023-01-03->2023-01-13 GOOG (maybe others) has (have) incorrect Market Cap $61B vs. $1.2T, 2023-10-31 switched to Google Finance data, 2023-11-16->17 no data downloaded because trip with Andreas some reason not working, 2023-12-01 switched to FMP data (upgraded in 2023-12-08 and 2024-01-12), 2025-01-23->24 GGAL issued 399RGT026 caused #get_alpaca_assets to crash
+# 04/24/2020 is first day with S&P 500 data (505 tickers) with Zacks Rank ordered alphabetically from Slickcharts (I believe), 04/28/2020 is first day with S&P 500 data (505 tickers) with Zacks Rank ordered by S&P 500 rank from Slickcharts, 05/08/2020 is first day with USA-listed stocks data (~4900 tickers) with Zacks Rank ordered by Market Cap Rank from TradingView, 07/21/2020 is first day with USA-listed tradable assets on Alpaca data (~6900 tickers) with Morningstar and Zacks Rank ordered by Alpaca from Yahoo Finance # some other nuances (like TradingView v2 data, incomplete Yahoo Finance data up until 07/24/2020, modifications/additions to Yahoo Finance data up until 08/07/2020), 10/16/2020 is first day with 'P/S (TTM)', 'EV' data, 10/30/2020 is first day with 'D/E (MRQ)', 05/13/2021 is first day with 'Forward P/E', 06/04/2021 is first day with 'P/E (TTM)' (could be derived in previous days) # 2020-05-18 is without zacks rank, issue, 2020-06-16 is a txt document with comma-seperated values but without zacks rank, 2020-10-30 and 2020-11-(02->05) missed a lot of tickers (~2325) since improper implementation of ticker_data_detailed['financialData'] (any ticker that has incomplete ticker_data_detailed['financialData'] is not recorded), 2020-07-21->2020-12-08 missed a lot of tickers (~400/day) since improper implementation of ticker_data_detailed['summaryDetail'], 10/30/2020->2021-01-05 missed some tickers (~10/day) since improper implementation of ticker_data_detailed['financialData'], 2020-12-02 and 2020-12-23 failed to save data due to requests error (2020-12-23 not sure) and 2021-03-02 saved late due to frozen Q all tickers after and including S have data from 2021-03-03 06:30 - 07:50, 2021-04-06->08 and 2021-07-07->08 no data downloaded because trips with Stephanie some reason not working, 2021-07-01->12 issue with anti-automation system (only downloaded 1/2 of tickers) fixed by adding header to fake as browser, 2021-09-08 frozen, 2021-10-04->06 frozen while on trip with Maja in Miami, 2021-10-19 wrote over when trying to download and save 2021-10-29 data, 2021-10-29 -> 2021-11-01 bad / duplicate (of 2021-10-28) data , 2021-11-04 froze, 2021-12-23->2022-01-03 & 2022-01-10->13 duplicate (at least the important) data, 2022-01-18 data is a bit corrupted since late save (mixed with 2022-01-19 06:30->09:22am data), 2022-01-26 & 2022-03-10 frozen, 2022-05-20->26 duplicate, 2022-10-31+ weird stuff happening with time.sleep() (sleeping for many minutes / hours at a time) & downloading (download pausing for hours at a time, taking 5x as long etc) and saving data (like save_portfolio_backup() saving to save_tickers_ms_zr_data() location) with new Apple update (Mac OS 12.6.1) even after restarting etc, 2022-12-16->2022-12-29 yfinance updated their page so get_ticker_data_detailed_yfinance() doesn't pull the necessary data, 2023-01-03->2023-01-13 GOOG (maybe others) has (have) incorrect Market Cap $61B vs. $1.2T, 2023-10-31 switched to Google Finance data, 2023-11-16->17 no data downloaded because trip with Andreas some reason not working, 2023-12-01 switched to FMP data (upgraded in 2023-12-08 and 2024-01-12), 2025-01-23->24 GGAL issued 399RGT026 caused #get_alpaca_assets to crash
 def get_saved_tickers_data(date, category='all', rankings=['zr'], additions=[]): # date is a string in format '%Y-%m-%d', categories: 'sp500', 'usa_by_tv' # refactor rankings
     if category == 'all':
         category = 'sp500' if datetime.strptime(date, '%Y-%m-%d').date() < datetime.strptime('2020-05-08', '%Y-%m-%d').date() else 'usa_by_tv' if datetime.strptime(date, '%Y-%m-%d').date() < datetime.strptime('2020-07-21', '%Y-%m-%d').date() else 'usa_alpaca_by_yf' + ('_and_' + '_'.join(additions) if additions else '') # '2020-08-08' # maybe refactor names usa_by_tv and usa_alpaca_by_yf names
@@ -521,7 +597,7 @@ def save_usa_alpaca_by_fmp_tickers_ms_zr_data(date): # maybe refactor and take a
                 (str(ticker_data_detailed['profile']['address']) + ", " + str(ticker_data_detailed['profile']['city']) + ", " + str(ticker_data_detailed['profile']['state']) + ", " + str(ticker_data_detailed['profile']['country'])) if ('address' in ticker_data_detailed['profile'] and 'city' in ticker_data_detailed['profile'] and 'country' in ticker_data_detailed['profile']) else None, # and 'state' in ticker_data_detailed['profile']['state'] # None, # None if ('summaryProfile' not in ticker_data_detailed) else str(ticker_data_detailed['summaryProfile']['state'] if 'state' in ticker_data_detailed['summaryProfile'] else None) + ", " + str(ticker_data_detailed['summaryProfile']['country'] if 'country' in ticker_data_detailed['summaryProfile'] else None), # 'summaryProfile' in ticker_data_detailed and all (key in ticker_data_detailed['summaryProfile'] for key in ['state', 'country']) # or not ticker_data_detailed['summaryProfile']
                 ticker_data_detailed['profile']['price'], # if 'Last' in ticker_data_detailed else float("NaN") # ticker_data_detailed['price']['regularMarketPrice'],
                 ticker_data_detailed['profile']['volAvg'] if 'volAvg' in ticker_data_detailed['profile'] else float("NaN"), # ticker_data_detailed['price']['regularMarketVolume'],
-                ticker_data_detailed['ratios'][0]['peRatioTTM'] if 'peRatioTTM' in ticker_data_detailed['ratios'][0] else float("NaN"), # if 'PE Ratio (TTM)' in ticker_data_detailed else float("NaN"), # ticker_data_detailed['summaryDetail']['trailingPE'] if ('summaryDetail' in ticker_data_detailed and ticker_data_detailed['summaryDetail'] and 'trailingPE' in ticker_data_detailed['summaryDetail']) else float("NaN"), # 'pe(ttm)': # using old version (with yf) get_ticker_data_detailed(): (ticker_data_detailed.info['trailingPE'] if 'trailingPE' in ticker_data_detailed.info else
+                ticker_data_detailed['ratios'][0]['peRatioTTM'] if 'peRatioTTM' in ticker_data_detailed['ratios'][0] else float("NaN"), # if 'PE Ratio (TTM)' in ticker_data_detailed else float("NaN"), # ticker_data_detailed['summaryDetail']['trailingPE'] if ('summaryDetail' in ticker_data_detailed and ticker_data_detailed['summaryDetail'] and 'trailingPE' in ticker_data_detailed['summaryDetail']) else float("NaN"), # 'pe(ttm)': # using old version (with yf) get_ticker_data_detailed_yfinance(): (ticker_data_detailed.info['trailingPE'] if 'trailingPE' in ticker_data_detailed.info else
                 None, # ticker_data_detailed['defaultKeyStatistics']['forwardPE'] if ('forwardPE' in ticker_data_detailed['defaultKeyStatistics']) else float("NaN"), # good to fail if no 'defaultKeyStatistics' since contains key metrics, failing on bad assets like: ['BCV-A', 'MH-D'], assets not worth extra logic # after analyzing TEAM on 2021-05-13 most likely this value is for the next 12 months and not fiscal year, but not 100% sure so leaving the description above as is
                 ticker_data_detailed['ratios'][0]['priceToSalesRatioTTM'] if 'priceToSalesRatioTTM' in ticker_data_detailed['ratios'][0] else float("NaN"),
                 ticker_data_detailed['financialsAnnual']['income'][0]['eps'] if (ticker_data_detailed['financialsAnnual']['income'] and 'eps' in ticker_data_detailed['financialsAnnual']['income'][0]) else float("NaN"), # extra check here and below since ETFs some other assets don't have income # ['defaultKeyStatistics']['trailingEps'] if ('trailingEps' in ticker_data_detailed['defaultKeyStatistics']) else float("NaN"), # maybe refactor - (unresolved) unsure why 'trailingEps' failing on quite a few Nano Cap tickers like: ['AEG', 'AJXA', 'YOLO', 'FFTY'] # if ('defaultKeyStatistics' in ticker_data_detailed...
@@ -635,7 +711,10 @@ def get_crunchbase_user_data_for_ticker(ticker, permalink_original, **params): #
     user_data_categories = ['Total Products Active', 'Downloads Last 30 Days', 'Monthly Download Growth', 'Active Tech Count', 'Monthly Visits', 'Monthly Visits Growth'] # maybe add registered patents, trademarks, site rank (globally)
     for user_data_category in user_data_categories:
         div_text_implement = div_text_4 if user_data_category == 'Monthly Download Growth' else div_text # not merging div_text and div_text_4 because re.search() is more computationally expensive
-        data["_".join(user_data_category.lower().split())] = float(re.search(r"" + user_data_category + " -?([0-9]+(,|\.)?)+", div_text_implement)[0].split()[-1].replace(',', '')) if re.search(r"" + user_data_category + " -?([0-9]+(,|\.)?)+", div_text_implement) else float("NaN") # div_text_4
+        pattern = rf"{user_data_category} -?([0-9]+([.,])?)+" # chatgpt implementation of below
+        match = re.search(pattern, div_text_implement) # chatgpt implementation of below
+        data["_".join(user_data_category.lower().split())] = (float(match[0].split()[-1].replace(',', '')) if match else float("NaN")) # chatgpt implementation of below
+        # data["_".join(user_data_category.lower().split())] = float(re.search(r"" + user_data_category + " -?([0-9]+(,|\.)?)+", div_text_implement)[0].split()[-1].replace(',', '')) if re.search(r"" + user_data_category + " -?([0-9]+(,|\.)?)+", div_text_implement) else float("NaN") # div_text_4
         if user_data_category in ['Monthly Visits Growth', 'Monthly Download Growth']:
             data["_".join(user_data_category.lower().split())] = data["_".join(user_data_category.lower().split())]/100
     # print(ticker + ": permalink: " + permalink + ", data: " + str(data)) # + ",\n headers: " + str(headers) + ", resp: " + str(resp)) #
@@ -767,9 +846,8 @@ def update_portfolio_postions_back_testing(portfolio, stop_day, end_day, **param
                 if END_DAY_OPEN_POSITIONS_FMP_24H_VOL:
                     portfolio['open'].loc[ticker, 'fmp_24h_vol'] = ticker_data_granular['volume'].sum() # maybe refactor, not exact but close, with last row error for previous days during current market hours last row has 0 volume in all cases observed so shouldn't be an issue
                 if END_DAY_OPEN_POSITIONS_GTRENDS_15D:
-                    my_cryptory, ticker_search_term = Cryptory(from_date=(stop_day - timedelta(days=15)).strftime('%Y-%m-%d'), to_date=stop_day.strftime('%Y-%m-%d')), ticker # maybe refactor to have company name # ticker if not re.search('-', ticker) else ticker.split("-")[0] # 15 days because from observations seems like a good amount
-                    google_trends = _fetch_data(get_cryptory, params={'my_cryptory': my_cryptory, 'data_type': 'google_trends', 'params': {'kw_list': [ticker_search_term]}}, error_str=" - No " + "google trends" + " data for ticker search term: " + ticker_search_term + " from: " + str(stop_day - timedelta(days=15)) + " to: " + str(stop_day), empty_data=pd.DataFrame())
-                    google_trends_slope = trendline(google_trends.sort_values('date', inplace=False, ascending=True)[ticker_search_term], reverse_to_ascending=True) if not google_trends.empty else float("NaN")
+                    google_trends = _fetch_data(get_google_trends, params={'kw_list': [ticker], 'from_date': stop_day - timedelta(days=15), 'to_date': stop_day}, error_str=" - No " + "google trends" + " data for ticker search term: " + ticker + " from: " + str(stop_day - timedelta(days=15)) + " to: " + str(stop_day), empty_data=pd.DataFrame())
+                    google_trends_slope = trendline(google_trends.sort_values('date', inplace=False, ascending=True)[ticker]) if not google_trends.empty else float("NaN") # sort_values is precautionary, should already be ascending:  # , reverse_to_ascending=True
                     portfolio['open'].loc[ticker, 'gtrends_15d'] = google_trends_slope
             if not tsl_or_sl:
                 portfolio['open'].loc[ticker, ['current_date','current_price','current_roi','tsl_armed','tsl_max_price']] = [stop_day, price, price_change, tsl_armed, tsl_max_price]
@@ -814,16 +892,15 @@ def update_portfolio_buy_and_sell_tickers(portfolio, tickers_to_buy, tickers_to_
                     buy_date = datetime.now() # price last_trade_data.price if last_trade_data else None, # maybe refactor and use yahoo finance price if last_trade_data fails # sell_price ticker_data.iloc[-1]['Adj Close']
                 if BUY_DATE_GTRENDS_15D:
                     # using Cryptory since good data and can retrieve other metrics like reddit subscribers, exchange rates, metal prices
-                    my_cryptory, ticker_search_term = Cryptory(from_date=(stop_day - timedelta(days=15)).strftime('%Y-%m-%d'), to_date=stop_day.strftime('%Y-%m-%d')), ticker # 15 days because from observations seems like a good amount # maybe refactor ticker_search_term and use company name in df_tickers_interval_stop/start or with a get request
-                    google_trends = _fetch_data(get_cryptory, params={'my_cryptory': my_cryptory, 'data_type': 'google_trends', 'params': {'kw_list': [ticker_search_term]}}, error_str=" - No " + "google trends" + " data for ticker search term: " + ticker_search_term + " from: " + str(stop_day - timedelta(days=15)) + " to: " + str(stop_day), empty_data=pd.DataFrame())
-                    google_trends_slope = trendline(google_trends.sort_values('date', inplace=False, ascending=True)[ticker_search_term], reverse_to_ascending=True) if not google_trends.empty else float("NaN")
+                    google_trends = _fetch_data(get_google_trends, params={'kw_list': [ticker], 'from_date': stop_day - timedelta(days=15), 'to_date': stop_day}, error_str=" - No " + "google trends" + " data for ticker search term: " + ticker + " from: " + str(stop_day - timedelta(days=15)) + " to: " + str(stop_day), empty_data=pd.DataFrame())
+                    google_trends_slope = trendline(google_trends.sort_values('date', inplace=False, ascending=True)[ticker]) if not google_trends.empty else float("NaN") # sort_values is precautionary, should already be ascending:  # , reverse_to_ascending=True
                 else:
                     google_trends_slope = 0
                 portfolio['balance']['usd'] = portfolio['balance']['usd'] - price*quantity
                 portfolio['open'].loc[ticker, ['position', 'balance', 'buy_date', 'buy_price', 'current_date', 'current_price', 'current_roi', 'fmp_24h_vol', 'gtrends_15d', 'rank_rise_d', 'tsl_armed', 'trade_notes']] = [('long' if not paper_trading else 'long-p'), quantity] + [buy_date, price]*2 + [0, fmp_24h_vol, google_trends_slope, rank_rise_d, False, trade_notes] # assuming buying at ~20 PST which means order gets executed at start of day next day every day # maybe refactor 'long-p' - alpaca
     return portfolio
 
-def tickers_with_stock_splits_in_day(date, tickers_for_period): # date is a string in format '%Y-%m-%d' (example: '2021-03-12')
+def tickers_with_stock_splits_in_day_yfinance(date, tickers_for_period): # date is a string in format '%Y-%m-%d' (example: '2021-03-12')
     tickers = {} # , random_int , randint(0, 100)
     headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10 7 4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'} # {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'}
     # if random_int % 20 == 0:
@@ -850,7 +927,7 @@ def tickers_with_stock_splits_in_day(date, tickers_for_period): # date is a stri
             tickers[ticker] = [{'split_ratio': split_ratio, 'ex_date': ex_date}]
     return tickers
 
-def tickers_with_stock_splits_in_period(start_day, **params): # no end day specified since end day will always be current day since if end day is not current day and ticker split after the end_day then the daily yahoo finance prices will be updated and reflect the stock split but the hourly yahoo finance prices will reflect the stock prices at that day
+def tickers_with_stock_splits_in_period_yfinance(start_day, **params): # no end day specified since end day will always be current day since if end day is not current day and ticker split after the end_day then the daily yahoo finance prices will be updated and reflect the stock split but the hourly yahoo finance prices will reflect the stock prices at that day
     tickers_for_period = {}
     stop_day, end_day = start_day, datetime.now() # don't allow stop_day to be less than start_day since if stock split before start_day then price change should already be accounted for
     usa_holidays = params['usa_holidays'] if 'usa_holidays' in params else {}
@@ -860,7 +937,7 @@ def tickers_with_stock_splits_in_period(start_day, **params): # no end day speci
         if count % 40 == 0: # maybe refactor take out since unlikely this will hit: 2000/365: 5.47 years
             print("Sleeping 7min every 40 requests on: " + str(datetime.now()))
             time.sleep(7*60)
-        tickers_for_day = _fetch_data(tickers_with_stock_splits_in_day, params={'date': stop_day.strftime('%Y-%m-%d'), 'tickers_for_period': tickers_for_period}, error_str=" - No (or issue with) tickers with stock splits on date: " + str(stop_day) + ", on: " + str(datetime.now()), empty_data={})
+        tickers_for_day = _fetch_data(tickers_with_stock_splits_in_day_yfinance, params={'date': stop_day.strftime('%Y-%m-%d'), 'tickers_for_period': tickers_for_period}, error_str=" - No (or issue with) tickers with stock splits on date: " + str(stop_day) + ", on: " + str(datetime.now()), empty_data={})
         tickers_for_period = {**tickers_for_period, **tickers_for_day}
         stop_day = stop_day + timedelta(days=1)
         while stop_day.weekday() > 4 or (stop_day.replace(hour=0, minute=0, second=0, microsecond=0) in usa_holidays): # interval_start_date/stop_day in usa_holidays # stop_day = (stop_day + timedelta(days=1)) if (stop_day.weekday() < 4) else (stop_day + timedelta(days=7-stop_day.weekday())) # to avoid weekends, refactor to avoid holidays (2020-05-25)
@@ -1830,7 +1907,7 @@ def portfolio_trading(portfolio, paper_trading=True, paper_trading_on_used_accou
                     todays_date = datetime.now()
                     portfolio = run_portfolio(portfolio, start_day=(todays_date - timedelta(days=DAYS)), end_day=todays_date, paper_trading=paper_trading)
                 for ticker in portfolio['open'].index:
-                    # ok to use price from Alpaca than Yahoo Finance since more real time (I think) and unlikely there is demand/supply anomaly or arbitrage opportunity when Alpaca uses 5 main (I think) exchanges and complicated and slow to fetch Yahoo Finance data in real time (maybe refactor) - have to use get_ticker_data_detailed()
+                    # ok to use price from Alpaca than Yahoo Finance since more real time (I think) and unlikely there is demand/supply anomaly or arbitrage opportunity when Alpaca uses 5 main (I think) exchanges and complicated and slow to fetch Yahoo Finance data in real time (maybe refactor) - have to use get_ticker_data_detailed_yfinance()
                     last_trade_data = _fetch_data(alpaca_api.get_latest_trade, params={'symbol': ticker}, error_str=" - No last trade from Alpaca for ticker: " + ticker + " on: " + str(datetime.now()), empty_data = {}) # if a stock quote features a single price, it is the most recent sale price accoridng to investopedia.com/ask/answers/042215/what-do-bid-and-ask-prices-represent-stock-quote.asp
                     price = last_trade_data.price if last_trade_data else float("NaN")
                     if np.isnan(price):
