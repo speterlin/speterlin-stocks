@@ -45,7 +45,7 @@ __all__ = [
     "run_portfolio_mmtv",
     "run_portfolio_random_sp500",
     "run_portfolio_mm",
-    "run_portfolio_ai_recommendations",
+    "run_portfolio_ai_recommendations_in_sector",
     "run_portfolio_top_n_gainers_ai_analysis",
     "get_senate_timestamps_and_tickers_inflows_and_outflows_by_month_for_stocks",
     "run_portfolio_senate_trading",
@@ -856,7 +856,7 @@ def update_portfolio_postions_back_testing(portfolio, stop_day, end_day, **param
 def update_portfolio_buy_and_sell_tickers(portfolio, tickers_to_buy, tickers_to_sell, stop_day, paper_trading, back_testing):
     USD_INVEST, USD_INVEST_MIN = portfolio['constants']['usd_invest'], portfolio['constants']['usd_invest_min']
     BUY_DATE_GTRENDS_15D = portfolio['constants']['buy_date_gtrends_15d']
-    tickers_to_avoid = {**{'TLSA': 'yf issue with hourly/minutely vs. daily data', 'RVI': 'ticker price issue and stock split not found on yf'}, **{key: value['reason'] for key,value in {**{'WLL': {'reason': 'stock split not updated on yf', 'good_after_date': datetime.strptime('2020_09_03 13:00:00', '%Y_%m_%d %H:%M:%S')}, 'MYT': {'reason': 'stock split not updated on yf', 'good_after_date': datetime.strptime('2020_08_27 13:00:00', '%Y_%m_%d %H:%M:%S')}, 'IAC': {'reason': 'stock split not updated on yf', 'good_after_date': datetime.strptime('2021_05_25 13:00:00', '%Y_%m_%d %H:%M:%S')}, 'ELP': {'reason': 'stock split not updated on yf', 'good_after_date': datetime.strptime('2021_04_28 13:00:00', '%Y_%m_%d %H:%M:%S')}, 'AIV': {'reason': 'stock split not updated on yf', 'good_after_date': datetime.strptime('2020_12_15 13:00:00', '%Y_%m_%d %H:%M:%S')}}, **{ticker: {'reason': 'stock information not on Alpaca', 'good_after_date': datetime.strptime('2029_06_06 13:00:00', '%Y_%m_%d %H:%M:%S')} for ticker in ['ADYEY', 'ATEYY', 'CTTAY', 'AMKBY', 'IFNNY', 'XIACY', 'NGLOY', 'NJDCY', 'SVNDY', 'PROSY', 'YZCAY', 'NVZMY', 'SFTBY', 'LSRCY', 'SMNEY', 'ZLNDY', 'MPNGY', 'HKXCY', 'GXYYY', 'SOBKY', 'TTDKY', 'NDEKY', 'HSHCY', 'SCHYY', 'GELYY', 'PNGAY', 'SHTDY', 'CRZBY', 'PBCRY', 'PPERY', 'WMMVY', 'ITOCY', 'ASHTY', 'OVCHY', 'SOUHY', 'LNVGY', 'SAXPY', 'RCRUY', 'ACGBY', 'IDCBY', 'BACHY', 'SDVKY', 'BAYRY', 'MURGY', 'BAESY', 'VWAGY', 'VWAPY', 'DHLGY', 'BASFY', 'NRDBY', 'BDRFY', 'MIELY', 'CSUAY', 'RNECY', 'ALIZY', 'CHGCY', 'SMMNY', 'BYDDY', 'TOELY', 'DSNKY', 'HOCPY', 'HTHIY']}}.items() if stop_day.date() < value['good_after_date'].date()}} # possibly add 'EDU' (issues between 2020-10-06->2021-01-22), 'NTES' (issues between 2020-08-27->2020-09-29), 'ELP' (similar for 'AVI'): stop_day < 2021-03-18 (divide by 2 - 10/1 split followed by a 1/5 split) elif stop_day < 2021-04-28 (multiply by 5 - 1/5 split) # in general avoid tickers with low market cap and issues (not worth extra trouble of coding around) or tickers with multiple splits in short time period (maybe refactor - would also have to refactor tickers_with_stock_splits_in_day())
+    tickers_to_avoid = {**{'TLSA': 'yf issue with hourly/minutely vs. daily data', 'RVI': 'ticker price issue and stock split not found on yf'}, **{key: value['reason'] for key,value in {**{'WLL': {'reason': 'stock split not updated on yf', 'good_after_date': datetime.strptime('2020_09_03 13:00:00', '%Y_%m_%d %H:%M:%S')}, 'MYT': {'reason': 'stock split not updated on yf', 'good_after_date': datetime.strptime('2020_08_27 13:00:00', '%Y_%m_%d %H:%M:%S')}, 'IAC': {'reason': 'stock split not updated on yf', 'good_after_date': datetime.strptime('2021_05_25 13:00:00', '%Y_%m_%d %H:%M:%S')}, 'ELP': {'reason': 'stock split not updated on yf', 'good_after_date': datetime.strptime('2021_04_28 13:00:00', '%Y_%m_%d %H:%M:%S')}, 'AIV': {'reason': 'stock split not updated on yf', 'good_after_date': datetime.strptime('2020_12_15 13:00:00', '%Y_%m_%d %H:%M:%S')}}, **{ticker: {'reason': 'stock information not on Alpaca', 'good_after_date': datetime.strptime('2029_06_06 13:00:00', '%Y_%m_%d %H:%M:%S')} for ticker in ['ADYEY', 'ATEYY', 'CTTAY', 'AMKBY', 'IFNNY', 'XIACY', 'NGLOY', 'NJDCY', 'SVNDY', 'PROSY', 'YZCAY', 'NVZMY', 'SFTBY', 'LSRCY', 'SMNEY', 'ZLNDY', 'MPNGY', 'HKXCY', 'GXYYY', 'SOBKY', 'TTDKY', 'NDEKY', 'HSHCY', 'SCHYY', 'GELYY', 'PNGAY', 'SHTDY', 'CRZBY', 'PBCRY', 'PPERY', 'WMMVY', 'ITOCY', 'ASHTY', 'OVCHY', 'SOUHY', 'LNVGY', 'SAXPY', 'RCRUY', 'ACGBY', 'IDCBY', 'BACHY', 'SDVKY', 'BAYRY', 'MURGY', 'BAESY', 'VWAGY', 'VWAPY', 'DHLGY', 'BASFY', 'NRDBY', 'BDRFY', 'MIELY', 'CSUAY', 'RNECY', 'ALIZY', 'CHGCY', 'SMMNY', 'BYDDY', 'TOELY', 'DSNKY', 'HOCPY', 'HTHIY']}}.items() if stop_day.date() < value['good_after_date'].date()}} # possibly add 'EDU' (issues between 2020-10-06->2021-01-22), 'NTES' (issues between 2020-08-27->2020-09-29), 'ELP' (similar for 'AVI'): stop_day < 2021-03-18 (divide by 2 - 10/1 split followed by a 1/5 split) elif stop_day < 2021-04-28 (multiply by 5 - 1/5 split) # in general avoid tickers with low market cap and issues (not worth extra trouble of coding around) or tickers with multiple splits in short time period (maybe refactor - would also have to refactor tickers_with_stock_splits_in_day()) # not refactoring ‘stock split not updated on yf’ code (4 repeated) since different good_after_date(s)
     for ticker, rank_rise_d in tickers_to_sell: # ticker, rank_rise_d = ticker_and_rank_rise_d[0], ticker_and_rank_rise_d[1]
         position, buy_price, quantity = portfolio['open'].loc[ticker, ['position', 'buy_price', 'balance']]
         if back_testing:
@@ -972,8 +972,8 @@ def run_portfolio(portfolio, **params): # call portfolio = run_portfolio(portfol
         portfolio = run_portfolio_random_sp500(portfolio, **params)
     elif portfolio['constants']['type'] == 'mm':
         portfolio = run_portfolio_mm(portfolio, **params)
-    elif portfolio['constants']['type'] == 'air':
-        portfolio = run_portfolio_ai_recommendations(portfolio, **params)
+    elif portfolio['constants']['type'] == 'airs':
+        portfolio = run_portfolio_ai_recommendations_in_sector(portfolio, **params)
     elif portfolio['constants']['type'] == 'tngaia':
         portfolio = run_portfolio_top_n_gainers_ai_analysis(portfolio, **params)
     elif portfolio['constants']['type'] == 'senate_trading':
@@ -1401,8 +1401,8 @@ def run_portfolio_mm(portfolio, start_day=None, end_day=None, paper_trading=True
             stop_day = stop_day + timedelta(days=1)
     return portfolio
 
-def run_portfolio_ai_recommendations(portfolio, start_day=None, end_day=None, air_sell=True, paper_trading=True, back_testing=False, limit_companies=33, back_running_allowance=11, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 180, 'tickers': 50, 'days': 1000}, **params): # keep **params here and in run_portfolio_rr() so can pass variables for backtesting cases in which the yahoo finance service is down but the data for start_day and end_day is already loaded
-    print("running run_portfolio_ai_recommendations()")
+def run_portfolio_ai_recommendations_in_sector(portfolio, start_day=None, end_day=None, airs_sell=True, paper_trading=True, back_testing=False, limit_companies=33, back_running_allowance=11, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 180, 'tickers': 50, 'days': 1000}, **params): # keep **params here and in run_portfolio_rr() so can pass variables for backtesting cases in which the yahoo finance service is down but the data for start_day and end_day is already loaded
+    print("running run_portfolio_ai_recommendations_in_sector()")
     if (not type(portfolio['constants']['up_down_move']) is list) or len(portfolio['constants']['up_down_move']) != 2:
         print("Error up/down move constant not a list or a list not == 2")
         return portfolio
@@ -1435,7 +1435,7 @@ def run_portfolio_ai_recommendations(portfolio, start_day=None, end_day=None, ai
                     print("Sleeping " + str(add_pauses_to_avoid_unsolved_error['time']/60) + "min every " + str(add_pauses_to_avoid_unsolved_error['days']) + " days on date: " + str(stop_day.date()))
                     time.sleep(add_pauses_to_avoid_unsolved_error['time'])
                 portfolio = update_portfolio_postions_back_testing(portfolio=portfolio, stop_day=stop_day, end_day=end_day, tickers_with_stock_splits=tickers_with_stock_splits) # maybe refactor throughout and make it function(param1, param2, ...) rather than function(param1=param1, param2=param2, ...)
-            if air_sell or (portfolio['balance']['usd'] >= portfolio['constants']['usd_invest_min']):
+            if airs_sell or (portfolio['balance']['usd'] >= portfolio['constants']['usd_invest_min']):
                 df_tickers_interval_stop = get_saved_tickers_data(date=stop_day.strftime('%Y-%m-%d'))
                 df_tickers_interval_stop = df_tickers_interval_stop[df_tickers_interval_stop['Market Cap'] > 0].sort_values('Market Cap', ascending=False, inplace=False)
                 if not df_tickers_interval_stop.empty:
@@ -1457,7 +1457,7 @@ def run_portfolio_ai_recommendations(portfolio, start_day=None, end_day=None, ai
                             if (ticker not in portfolio['open'].index) and (rating >= UP_MOVE): # care if ticker has just turned to buy # convenient since if 'Zacks Rank' is None conditional expression returns False instead of returning an error and continues, much faster
                                 print(ticker + ": " + " buying")
                                 tickers_to_buy.append([ticker, rating]) # tickers_to_buy[ticker] = df_tickers_interval_stop.loc[ticker, 'Zacks Rank'] - df_tickers_interval_start.loc[ticker, 'Zacks Rank']
-                            elif air_sell and (ticker in portfolio['open'].index) and (portfolio['open'].loc[ticker, 'trade_notes'] in ["Filled", "~Filled", None]) and (rating <= DOWN_MOVE): # don't care if ticker has just turned to sell or has been sell for a while: if (df_tickers_interval_stop.loc[ticker, 'Zacks Rank'] > 3) and (df_tickers_interval_start.loc[ticker, 'Zacks Rank'] <= 3):
+                            elif airs_sell and (ticker in portfolio['open'].index) and (portfolio['open'].loc[ticker, 'trade_notes'] in ["Filled", "~Filled", None]) and (rating <= DOWN_MOVE): # don't care if ticker has just turned to sell or has been sell for a while: if (df_tickers_interval_stop.loc[ticker, 'Zacks Rank'] > 3) and (df_tickers_interval_start.loc[ticker, 'Zacks Rank'] <= 3):
                                 print(ticker + ": " + " selling")
                                 tickers_to_sell.append([ticker, rating]) # tickers_to_sell[ticker] = df_tickers_interval_stop.loc[ticker, 'Zacks Rank'] - df_tickers_interval_start.loc[ticker, 'Zacks Rank']
                         except Exception as e:
@@ -2003,7 +2003,7 @@ def portfolio_trading(portfolio, paper_trading=True, paper_trading_on_used_accou
 
 # as of 09/28/2020 changed portfolio_constants naming of file from (example) 100_100_15 to 100_-100_15
 def save_portfolio_backup(portfolio, remove_old_portfolio=False, date=None, **params): # can add logic for different types of portfolio i.e. rr with different kinds of parameters i.e. different up and down moves
-    portfolio_constants = "_".join([str(value) if key != 'up_down_move' else str(value) + ("_" + str(-value) if portfolio['constants']['type'] not in ['tilupccu', 'air', 'tngaia', 'senate_trading', 'sma_mm'] else "") for key,value in list(portfolio['constants'].items())]) # maybe refactor if implement different algorithms, for now all algorithms (currently only rr) have equal up_move and down_move and implement both up_move and down_move
+    portfolio_constants = "_".join([str(value) if key != 'up_down_move' else str(value) + ("_" + str(-value) if portfolio['constants']['type'] not in ['tilupccu', 'airs', 'tngaia', 'senate_trading', 'sma_mm'] else "") for key,value in list(portfolio['constants'].items())]) # maybe refactor if implement different algorithms, for now all algorithms (currently only rr) have equal up_move and down_move and implement both up_move and down_move
     date = date if date else datetime.now().strftime('%Y-%m-%d')
     usa_holidays = params['usa_holidays'] if 'usa_holidays' in params else {} # maybe refactor assuming that if don't pass in usa_holidays don't want to delete old portfolio_backup # {} so not in usa_holidays doesn't fail
     if remove_old_portfolio: # and (datetime.now(eastern).hour == 9) and (datetime.now().minute < 4): # maybe refactor and change < 4 (since cutting it close with other processes running before), # if (datetime.now(eastern).weekday() < 5) and ((datetime.now(eastern).replace(hour=0, minute=0, second=0, microsecond=0).replace(tzinfo=None) not in usa_holidays) and (datetime.now(eastern).hour == 9) and (datetime.now(eastern).minute < 4):
