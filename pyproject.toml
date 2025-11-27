@@ -12,16 +12,16 @@ dependencies = [
     "numpy",
     "pandas>=2.0",
     "datetime",
-    "yfinance",
+    "yfinance==0.1.52",
     "beautifulsoup4", # bs4
     "pytrends",
     "openai", # ~
     "langchain-openai",
     "google-generativeai",
     "unidecode",
-    "fake_headers",
+    "fake-headers",
     "pytz",
-    "alpaca_trade_api", # ~
+    "alpaca-trade-api --no-dependencies", # ~
     "twilio" # ~
 ]
 
