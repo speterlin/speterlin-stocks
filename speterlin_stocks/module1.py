@@ -491,11 +491,11 @@ def get_google_trends(kw_list, from_date, to_date, trend_days=270, cat=0, geo=''
     if len(kw_list) != 1: # not doing multirange_interest_over_time: len(kw_list)==0 or len(kw_list)>5
         print("Error: The keyword list must be 1, not doing multirange_interest_over_time") # be > 0 and can contain at most 5 words
         return data
+    # not verifying from_date, to_date types, _fetch_data should handle error
     n_days = (to_date - from_date).days
     if n_days>270 or trend_days>270:
         print("Error: To - From Dates or Trend days must not exceed 270")
         return data
-    # not verifying from_date, to_date types
     _pytrends = TrendReq(hl=hl, tz=tz)
     # pytrends.build_payload(kw_list, cat=0, timeframe=, geo='', gprop='')
     try:
@@ -891,7 +891,7 @@ def update_portfolio_buy_and_sell_tickers(portfolio, tickers_to_buy, tickers_to_
                     quantity, price, alpaca_ticker_order, alpaca_ticker_open_orders, trade_notes = alpaca_trade_ticker(ticker=ticker, side="buy", usd_invest=usd_invest, paper_trading=paper_trading) # not setting price=price, even though potential quantity=0 error from price > usd_invest logic, since price is yahoo finance price, refactor if issue
                     buy_date = datetime.now() # price last_trade_data.price if last_trade_data else None, # maybe refactor and use yahoo finance price if last_trade_data fails # sell_price ticker_data.iloc[-1]['Adj Close']
                 if BUY_DATE_GTRENDS_15D:
-                    # using Cryptory since good data and can retrieve other metrics like reddit subscribers, exchange rates, metal prices
+                    # using Pytrends (Cryptory is deprecated doesn't work after Python 3.6-3.8) since good data and can retrieve other metrics like reddit subscribers, exchange rates, metal prices
                     google_trends = _fetch_data(get_google_trends, params={'kw_list': [ticker], 'from_date': stop_day - timedelta(days=15), 'to_date': stop_day}, error_str=" - No " + "google trends" + " data for ticker search term: " + ticker + " from: " + str(stop_day - timedelta(days=15)) + " to: " + str(stop_day), empty_data=pd.DataFrame())
                     google_trends_slope = trendline(google_trends.sort_values('date', inplace=False, ascending=True)[ticker]) if not google_trends.empty else float("NaN") # sort_values is precautionary, should already be ascending:  # , reverse_to_ascending=True
                 else:
