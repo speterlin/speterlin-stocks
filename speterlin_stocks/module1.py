@@ -1,3 +1,12 @@
+# global objects (API clients, config, globals)
+alpaca_api = None
+FMP_API_KEY = None
+google_gemini_pro_model = None
+twilio_client = None
+twilio_phone_to = None
+twilio_phone_from = None
+portfolio_account = None # maybe add portfolio_name later for more consistent logic
+
 __all__ = [
     "_fetch_data",
     "trendline",
