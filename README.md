@@ -8,5 +8,5 @@ pip install speterlin-stocks
 ```
 And then import package like this:
 ```python
-import speterlin_stocks as stocks
+import speterlin_stocks.module1 as stocks
 ```

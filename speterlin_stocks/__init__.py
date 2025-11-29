@@ -4,12 +4,13 @@
 
 """
 
-__version__ = '0.1.8'
+__version__ = '0.1.9'
 
+# from .module1 import *
 from . import module1
 
-def __getattr__(name):
-    return getattr(module1, name)
-
-def __setattr__(name, value):
-    setattr(module1, name, value)
+# def __getattr__(name):
+#     return getattr(module1, name)
+#
+# def __setattr__(name, value):
+#     setattr(module1, name, value)
