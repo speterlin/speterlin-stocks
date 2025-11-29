@@ -4,10 +4,9 @@
 
 """
 
-__version__ = '0.1.7'
+__version__ = '0.1.8'
 
 from . import module1
-from .module1 import *
 
 def __getattr__(name):
     return getattr(module1, name)

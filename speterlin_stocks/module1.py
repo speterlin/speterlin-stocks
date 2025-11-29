@@ -112,6 +112,7 @@ import json
 from datetime import datetime, timedelta
 
 def get_ticker_data_quote_fmp(ticker):  # maybe refactor add real_time to name
+    global FMP_API_KEY
     data = {}
     session = requests.Session()
     request = f"https://financialmodelingprep.com/api/v3/quote/{ticker}\
@@ -125,6 +126,7 @@ def get_ticker_data_quote_fmp(ticker):  # maybe refactor add real_time to name
 
 # support inquiry (FMP): Our data is aligned with NASDAQ data. Some ETFs are listed different in FMP / Yahoo Finance than Alpaca like 'BRK-B' (FMP / Yahoo Finance) vs. 'BRK.B' (Alpaca)
 def get_ticker_data_granular_fmp(ticker, start_datetime=None, end_datetime=None, interval="1hour"): # interval values: 1min, 5min, 15min, 30min, 1hour, 4hour, supposedly 1day works but not listed on api documents
+    global FMP_API_KEY
     data = []
     session = requests.Session()
     request = f"https://financialmodelingprep.com/api/v3/historical-chart/{interval}/{ticker}?from={start_datetime.strftime('%Y-%m-%d')}&to={end_datetime.strftime('%Y-%m-%d')}\
@@ -141,6 +143,7 @@ def get_ticker_data_granular_fmp(ticker, start_datetime=None, end_datetime=None,
 
 # using this / historical-price-full instead of get_ticker_data_granular_fmp / historical-chart with interval="4hour" because no full day interval (listed on API) for historical-chart and more potential useful data points
 def get_ticker_data_fmp(ticker, start_datetime=None, end_datetime=None): # Both this function and above work with 6 years data, API documentation: By default the limit is 5 years of historical data, to get data prior to this date, please use the to & from parameters with a limit of 5 years. # support inquiry (FMP): You can change the “From” and “To” parameters to get past data, but due to the sheer size and volume of the intraday historical chart data, there are limits to the number of records that can be returned in a given query. I recommend querying no more than 1500 records per query
+    global FMP_API_KEY
     data = {}
     session = requests.Session()
     request = f"https://financialmodelingprep.com/api/v3/historical-price-full/{ticker}?from={start_datetime.strftime('%Y-%m-%d')}&to={end_datetime.strftime('%Y-%m-%d')}\
@@ -155,6 +158,7 @@ def get_ticker_data_fmp(ticker, start_datetime=None, end_datetime=None): # Both 
     return df
 
 def get_ticker_data_detailed_fmp(ticker): # maybe refactor add real_time to name
+    global FMP_API_KEY
     data = {}
     session = requests.Session()
     request = f"https://financialmodelingprep.com/api/v4/company-outlook?symbol={ticker}\
@@ -165,6 +169,7 @@ def get_ticker_data_detailed_fmp(ticker): # maybe refactor add real_time to name
     return data
 
 def get_ticker_balance_sheet_data_fmp(ticker, period="annual"):
+    global FMP_API_KEY
     data = []
     session = requests.Session()
     request = f"https://financialmodelingprep.com/api/v3/balance-sheet-statement/{ticker}?period={period}\
@@ -179,6 +184,7 @@ def get_ticker_balance_sheet_data_fmp(ticker, period="annual"):
     return df
 
 def get_ticker_stock_news_articles_fmp(ticker, limit=5): # maybe refactor add real_time to name
+    global FMP_API_KEY
     data = []
     session = requests.Session()
     request = f"https://financialmodelingprep.com/api/v3/stock_news?tickers={ticker}&limit={limit}\
@@ -193,6 +199,7 @@ def get_ticker_stock_news_articles_fmp(ticker, limit=5): # maybe refactor add re
     return df
 
 def get_daily_stock_gainers_fmp(): # maybe refactor add real_time to name
+    global FMP_API_KEY
     data = []
     session = requests.Session()
     request = f"https://financialmodelingprep.com/api/v3/stock_market/gainers?\
@@ -205,6 +212,7 @@ def get_daily_stock_gainers_fmp(): # maybe refactor add real_time to name
     return df
 
 def tickers_with_stock_splits_in_85_days_period_fmp(start_datetime=None, end_datetime=None): # only works for span of ~85 days (including weekends) just under 3 months span
+    global FMP_API_KEY
     data = []
     session = requests.Session()
     request = f"https://financialmodelingprep.com/api/v3/stock_split_calendar?from={start_datetime.strftime('%Y-%m-%d')}&to={end_datetime.strftime('%Y-%m-%d')}\
@@ -231,6 +239,7 @@ def tickers_with_stock_splits_in_period_fmp(start_day): # no end day specified s
 
 # note some tickers are returned different than normal ie 'BRK.B' is returned 'BRK-B'
 def get_etf_constituents_fmp(etf):
+    global FMP_API_KEY
     data = []
     session = requests.Session()
     request = f"https://financialmodelingprep.com/api/v3/etf-holder/{etf}\
@@ -243,6 +252,7 @@ def get_etf_constituents_fmp(etf):
 
 # data goes back to 2014 / 10 years ago?
 def get_senate_trading_symbol_fmp(ticker):
+    global FMP_API_KEY
     data = []
     session = requests.Session()
     request = f"https://financialmodelingprep.com/api/v4/senate-trading?symbol={ticker}\
@@ -460,6 +470,7 @@ def should_I_buy_the_stock_openai (analysis): # get_investment_recommendation_op
     return investment_recommendation, tokens_used
 
 def should_I_buy_the_stock_google_gemini_pro(ticker, company_name, location=None, add_technical=False): # query # , ai="google-gemini-pro"
+    global google_gemini_pro_model
     # agent.run(query) Outputs Company name, Ticker
     # company_name,ticker,tokens_used=get_stock_ticker(query)
     # print({"Query":query,"Company_name":company_name,"Tokens_used":tokens_used,"Ticker":ticker})
@@ -733,6 +744,7 @@ import math
 
 # alpaca_exchanges = {'IEX (Investors Exchange LLC)', 'NYSE National, Inc.', 'Nasdaq BX, Inc.', 'Nasdaq PSX', 'NYSE Chicago, Inc.', 'AMEX'}
 def alpaca_trade_ticker(ticker, side, usd_invest=None, quantity=None, price=None, paper_trading=True, open_time=5, other_notes=None): # added open_time due to retrying paper order 'FGF' error 2022-12-13 "Partially filled" listed as "~Filled" - in past testing conditions 0 "~Filled" positions which means open_order gets processed immediately but retrying paper orders are filled during market hours different testing conditions # maybe refactor side logic as precautionary in case alpaca api changes from normal "buy" and "sell" # fetching price and calculating quantity in method since better to get price as close to executing alpaca_api.submit_order as possible even though when not back_testing using same price for data analysis and trading (Alpaca), unlike in crypto - CoinGecko (which is exchange volume-weighted) for data analysis and Binance for trading
+    global portfolio_account, twilio_client, twilio_phone_from, twilio_phone_to
     if not (usd_invest or quantity): # or (quantity and not (quantity % int(quantity) == 0)) # using this implementation instead of: isinstance(quantity, int) since balance often comes in as 21.0 or 10.0 which according to isinstance is not an integer when it should pass as an integer/whole number # on alpaca (and on exchanges in general) can't buy fractions of shares (unless a brokerage breaks up shares and sells) in contrast to Binance (and crypto exchanges in general) but let "ATrade Error"
         raise ValueError("usd_invest or quantity required") #  and if quantity specified must be an integer
     last_trade_data = _fetch_data(alpaca_api.get_latest_trade, params={'symbol': ticker}, error_str=" - No last trade from Alpaca for ticker: " + ticker + " on: " + str(datetime.now()), empty_data = {})
@@ -780,6 +792,7 @@ def get_alpaca_assets(alpaca_account, alpaca_open_orders=[]):
 
 # can refactor and make it exchange_check_24h_vol
 def fmp_check_24h_vol(ticker, fmp_24h_vol, datetime, fmp_24h_vol_min=5000, paper_trading=False): # 50000 (shares) min since binance_check_24h_vol_and_price_in_btc() has 5BTC has min which in 2020 =~ $50000
+    global portfolio_account, twilio_client, twilio_phone_from, twilio_phone_to
     fmp_24h_vol_too_low = False
     if fmp_24h_vol <= fmp_24h_vol_min:
         fmp_24h_vol_too_low = True
@@ -1874,6 +1887,7 @@ from pytz import timezone
 eastern = timezone('US/Eastern') # maybe refactor to mimick crypto.py which uses + timedelta(hours=7) instead of using timezone
 
 def portfolio_trading(portfolio, paper_trading=True, paper_trading_on_used_account=False, portfolio_usd_value_negative_change_from_max_limit=-0.30, portfolio_current_roi_restart={'engaged': False, 'limit': 0.075}, download_and_save_tickers_data=False): # refactor to mimick run_portfolio_rr # short = False, possibly add short logic # maybe refactor buying_disabled to be None as default and then change within function (or if specified) based on certain conditions # , buying_disabled=False
+    global portfolio_account, twilio_client, twilio_phone_from, twilio_phone_to
     DAYS = portfolio['constants']['days']
     STOP_LOSS = portfolio['constants']['sl']
     TRAILING_STOP_LOSS_ARM, TRAILING_STOP_LOSS_PERCENTAGE = portfolio['constants']['tsl_a'], portfolio['constants']['tsl_p']
@@ -2012,6 +2026,7 @@ def portfolio_trading(portfolio, paper_trading=True, paper_trading_on_used_accou
 
 # as of 09/28/2020 changed portfolio_constants naming of file from (example) 100_100_15 to 100_-100_15
 def save_portfolio_backup(portfolio, remove_old_portfolio=False, date=None, **params): # can add logic for different types of portfolio i.e. rr with different kinds of parameters i.e. different up and down moves
+    global portfolio_account
     portfolio_constants = "_".join([str(value) if key != 'up_down_move' else str(value) + ("_" + str(-value) if portfolio['constants']['type'] not in ['tilupccu', 'airs', 'tngaia', 'senate_trading', 'sma_mm'] else "") for key,value in list(portfolio['constants'].items())]) # maybe refactor if implement different algorithms, for now all algorithms (currently only rr) have equal up_move and down_move and implement both up_move and down_move
     date = date if date else datetime.now().strftime('%Y-%m-%d')
     usa_holidays = params['usa_holidays'] if 'usa_holidays' in params else {} # maybe refactor assuming that if don't pass in usa_holidays don't want to delete old portfolio_backup # {} so not in usa_holidays doesn't fail
@@ -2028,6 +2043,7 @@ def save_portfolio_backup(portfolio, remove_old_portfolio=False, date=None, **pa
     return portfolio
 
 def get_saved_portfolio_backup(portfolio_name): # portfolio name is portfolio_ + constants, like: portfolio_50_20_-0.3_0.5_-0.2_0.1_0.01_True_False_False # date is a string in format '%Y-%m-%d'
+    global portfolio_account
     try:
         f = open('data/stocks/saved_portfolio_backups/' + portfolio_account + "/" + portfolio_name + '.pckl', 'rb')
         portfolio = pd.read_pickle(f)
