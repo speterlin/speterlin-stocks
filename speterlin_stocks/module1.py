@@ -17,7 +17,7 @@ __all__ = [
     "get_ticker_balance_sheet_data_fmp",
     "get_ticker_stock_news_articles_fmp",
     "get_daily_stock_gainers_fmp",
-    "tickers_with_stock_splits_in_85_days_period_fmp",
+    "get_tickers_with_stock_splits_in_85_days_period_fmp",
     "tickers_with_stock_splits_in_period_fmp",
     # "get_etf_constituents_fmp"
     "get_senate_trading_symbol_fmp",
@@ -32,10 +32,10 @@ __all__ = [
     "should_I_buy_the_stock_google_gemini_pro",
     "get_google_trends", # replaces "get_cryptory",
     "get_saved_tickers_data",
-    # "save_usa_by_tv_tickers_zr_data"
-    "save_tickers_ms_zr_data",
-    "save_tickers_gainers_data",
-    "save_usa_alpaca_by_fmp_tickers_ms_zr_data",
+    # "save_usa_tv_tickers_zacks_data"
+    "save_tickers_yf_and_fmp_data",
+    "save_tickers_daily_gainers_fmp",
+    "save_usa_alpaca_tickers_fmp_data",
     # "crunchbase_search_permalinks",
     # "crunchbase_check_ticker_and_permalink"
     # "get_crunchbase_user_data_for_ticker"
@@ -211,7 +211,7 @@ def get_daily_stock_gainers_fmp(): # maybe refactor add real_time to name
     df = df.dropna(how="any") # drops missing values
     return df
 
-def tickers_with_stock_splits_in_85_days_period_fmp(start_datetime=None, end_datetime=None): # only works for span of ~85 days (including weekends) just under 3 months span
+def get_tickers_with_stock_splits_in_85_days_period_fmp(start_datetime=None, end_datetime=None): # only works for span of ~85 days (including weekends) just under 3 months span
     # global FMP_API_KEY
     data = []
     session = requests.Session()
@@ -230,7 +230,7 @@ def tickers_with_stock_splits_in_period_fmp(start_day): # no end day specified s
         if next_stop_day.date() > end_day.date():
             next_stop_day = end_day
         print(str(stop_day) + " to " + str(next_stop_day))
-        tickers_in_85_days_period = _fetch_data(tickers_with_stock_splits_in_85_days_period_fmp, params={'start_datetime': stop_day, 'end_datetime': next_stop_day}, error_str=" - No (or issue with) tickers with stock splits from date: " + str(stop_day) + " to next date: " + str(next_stop_day) + ", on: " + str(datetime.now()), empty_data=[])
+        tickers_in_85_days_period = _fetch_data(get_tickers_with_stock_splits_in_85_days_period_fmp, params={'start_datetime': stop_day, 'end_datetime': next_stop_day}, error_str=" - No (or issue with) tickers with stock splits from date: " + str(stop_day) + " to next date: " + str(next_stop_day) + ", on: " + str(datetime.now()), empty_data=[])
         tickers_for_period = tickers_for_period + tickers_in_85_days_period
         stop_day = next_stop_day + timedelta(days=2) # + 2 day to prevent inclusive values (FMP for some reason adds a one day buffer at the end of the stock_split_calendar API call query - returns values up until end_datetime + 1 day)
     df = pd.DataFrame(tickers_for_period)
@@ -527,7 +527,7 @@ def get_google_trends(kw_list, from_date, to_date, trend_days=270, cat=0, geo=''
         data.drop('isPartial', axis=1, inplace=True)
     return data
 
-# 04/24/2020 is first day with S&P 500 data (505 tickers) with Zacks Rank ordered alphabetically from Slickcharts (I believe), 04/28/2020 is first day with S&P 500 data (505 tickers) with Zacks Rank ordered by S&P 500 rank from Slickcharts, 05/08/2020 is first day with USA-listed stocks data (~4900 tickers) with Zacks Rank ordered by Market Cap Rank from TradingView, 07/21/2020 is first day with USA-listed tradable assets on Alpaca data (~6900 tickers) with Morningstar and Zacks Rank ordered by Alpaca from Yahoo Finance # some other nuances (like TradingView v2 data, incomplete Yahoo Finance data up until 07/24/2020, modifications/additions to Yahoo Finance data up until 08/07/2020), 10/16/2020 is first day with 'P/S (TTM)', 'EV' data, 10/30/2020 is first day with 'D/E (MRQ)', 05/13/2021 is first day with 'Forward P/E', 06/04/2021 is first day with 'P/E (TTM)' (could be derived in previous days) # 2020-05-18 is without zacks rank, issue, 2020-06-16 is a txt document with comma-seperated values but without zacks rank, 2020-10-30 and 2020-11-(02->05) missed a lot of tickers (~2325) since improper implementation of ticker_data_detailed['financialData'] (any ticker that has incomplete ticker_data_detailed['financialData'] is not recorded), 2020-07-21->2020-12-08 missed a lot of tickers (~400/day) since improper implementation of ticker_data_detailed['summaryDetail'], 10/30/2020->2021-01-05 missed some tickers (~10/day) since improper implementation of ticker_data_detailed['financialData'], 2020-12-02 and 2020-12-23 failed to save data due to requests error (2020-12-23 not sure) and 2021-03-02 saved late due to frozen Q all tickers after and including S have data from 2021-03-03 06:30 - 07:50, 2021-04-06->08 and 2021-07-07->08 no data downloaded because trips with Stephanie some reason not working, 2021-07-01->12 issue with anti-automation system (only downloaded 1/2 of tickers) fixed by adding header to fake as browser, 2021-09-08 frozen, 2021-10-04->06 frozen while on trip with Maja in Miami, 2021-10-19 wrote over when trying to download and save 2021-10-29 data, 2021-10-29 -> 2021-11-01 bad / duplicate (of 2021-10-28) data , 2021-11-04 froze, 2021-12-23->2022-01-03 & 2022-01-10->13 duplicate (at least the important) data, 2022-01-18 data is a bit corrupted since late save (mixed with 2022-01-19 06:30->09:22am data), 2022-01-26 & 2022-03-10 frozen, 2022-05-20->26 duplicate, 2022-10-31+ weird stuff happening with time.sleep() (sleeping for many minutes / hours at a time) & downloading (download pausing for hours at a time, taking 5x as long etc) and saving data (like save_portfolio_backup() saving to save_tickers_ms_zr_data() location) with new Apple update (Mac OS 12.6.1) even after restarting etc, 2022-12-16->2022-12-29 yfinance updated their page so get_ticker_data_detailed_yfinance() doesn't pull the necessary data, 2023-01-03->2023-01-13 GOOG (maybe others) has (have) incorrect Market Cap $61B vs. $1.2T, 2023-10-31 switched to Google Finance data, 2023-11-16->17 no data downloaded because trip with Andreas some reason not working, 2023-12-01 switched to FMP data (upgraded in 2023-12-08 and 2024-01-12), 2025-01-23->24 GGAL issued 399RGT026 caused #get_alpaca_assets to crash
+# 04/24/2020 is first day with S&P 500 data (505 tickers) with Zacks Rank ordered alphabetically from Slickcharts (I believe), 04/28/2020 is first day with S&P 500 data (505 tickers) with Zacks Rank ordered by S&P 500 rank from Slickcharts, 05/08/2020 is first day with USA-listed stocks data (~4900 tickers) with Zacks Rank ordered by Market Cap Rank from TradingView, 07/21/2020 is first day with USA-listed tradable assets on Alpaca data (~6900 tickers) with Morningstar and Zacks Rank ordered by Alpaca from Yahoo Finance # some other nuances (like TradingView v2 data, incomplete Yahoo Finance data up until 07/24/2020, modifications/additions to Yahoo Finance data up until 08/07/2020), 10/16/2020 is first day with 'P/S (TTM)', 'EV' data, 10/30/2020 is first day with 'D/E (MRQ)', 05/13/2021 is first day with 'Forward P/E', 06/04/2021 is first day with 'P/E (TTM)' (could be derived in previous days) # 2020-05-18 is without zacks rank, issue, 2020-06-16 is a txt document with comma-seperated values but without zacks rank, 2020-10-30 and 2020-11-(02->05) missed a lot of tickers (~2325) since improper implementation of ticker_data_detailed['financialData'] (any ticker that has incomplete ticker_data_detailed['financialData'] is not recorded), 2020-07-21->2020-12-08 missed a lot of tickers (~400/day) since improper implementation of ticker_data_detailed['summaryDetail'], 10/30/2020->2021-01-05 missed some tickers (~10/day) since improper implementation of ticker_data_detailed['financialData'], 2020-12-02 and 2020-12-23 failed to save data due to requests error (2020-12-23 not sure) and 2021-03-02 saved late due to frozen Q all tickers after and including S have data from 2021-03-03 06:30 - 07:50, 2021-04-06->08 and 2021-07-07->08 no data downloaded because trips with Stephanie some reason not working, 2021-07-01->12 issue with anti-automation system (only downloaded 1/2 of tickers) fixed by adding header to fake as browser, 2021-09-08 frozen, 2021-10-04->06 frozen while on trip with Maja in Miami, 2021-10-19 wrote over when trying to download and save 2021-10-29 data, 2021-10-29 -> 2021-11-01 bad / duplicate (of 2021-10-28) data , 2021-11-04 froze, 2021-12-23->2022-01-03 & 2022-01-10->13 duplicate (at least the important) data, 2022-01-18 data is a bit corrupted since late save (mixed with 2022-01-19 06:30->09:22am data), 2022-01-26 & 2022-03-10 frozen, 2022-05-20->26 duplicate, 2022-10-31+ weird stuff happening with time.sleep() (sleeping for many minutes / hours at a time) & downloading (download pausing for hours at a time, taking 5x as long etc) and saving data (like save_portfolio_backup() saving to save_tickers_yf_and_fmp_data() location) with new Apple update (Mac OS 12.6.1) even after restarting etc, 2022-12-16->2022-12-29 yfinance updated their page so get_ticker_data_detailed_yfinance() doesn't pull the necessary data, 2023-01-03->2023-01-13 GOOG (maybe others) has (have) incorrect Market Cap $61B vs. $1.2T, 2023-10-31 switched to Google Finance data, 2023-11-16->17 no data downloaded because trip with Andreas some reason not working, 2023-12-01 switched to FMP data (upgraded in 2023-12-08 and 2024-01-12), 2025-01-23->24 GGAL issued 399RGT026 caused #get_alpaca_assets to crash
 def get_saved_tickers_data(date, category='all', rankings=['zr'], additions=[]): # date is a string in format '%Y-%m-%d', categories: 'sp500', 'usa_by_tv' # refactor rankings
     if category == 'all':
         category = 'sp500' if datetime.strptime(date, '%Y-%m-%d').date() < datetime.strptime('2020-05-08', '%Y-%m-%d').date() else 'usa_by_tv' if datetime.strptime(date, '%Y-%m-%d').date() < datetime.strptime('2020-07-21', '%Y-%m-%d').date() else 'usa_alpaca_by_yf' + ('_and_' + '_'.join(additions) if additions else '') # '2020-08-08' # maybe refactor names usa_by_tv and usa_alpaca_by_yf names
@@ -542,7 +542,7 @@ def get_saved_tickers_data(date, category='all', rankings=['zr'], additions=[]):
     return df_tickers_historical
 
 # have to download csv file beforehand and save in 'data/stocks/tv_screener_by_market_cap/' as: 'america_" + date + ".csv"'
-def save_usa_by_tv_tickers_zr_data(date): # maybe refactor, only for companies above $2bn Market Cap
+def save_usa_tv_tickers_zacks_data(date): # maybe refactor, only for companies above $2bn Market Cap
     trading_view_ratings = {"Strong Buy": 1, "Buy": 2, "Neutral": 3, "Sell": 4, "Strong Sell": 5}
     # get publicly listed (in USA exchanges) companies sorted by market cap # on tradingview.com/screener/: remove Change, Price to Earnings Ratio (TTM), add D/E Ratio (MRQ), Div Yield (FY), P/FCF (TTM), P/B (FY), EV (MRQ), maybe add Commodity Channel Index (20), EV/EBITDA (TTM), Goodwill, Industry, P/S (FY), Total (Current) Assets, Return on Assets/Equity/Invested Capital # issue: unsure why some tickers are removed from tradingview.com/screener/ day-to-day
     df_usa_by_tv_tickers_zr = pd.read_csv("data/stocks/tv_screener_by_market_cap/america_" + date + ".csv")
@@ -564,22 +564,22 @@ def save_usa_by_tv_tickers_zr_data(date): # maybe refactor, only for companies a
     f.close()
     return df_usa_by_tv_tickers_zr
 
-def save_tickers_ms_zr_data(df_tickers, date, additions=[]): # date is in format '%Y-%m-%d'
-    f = open('data/stocks/saved_tickers_data/' + 'usa_alpaca_by_yf' + ('_and_' + '_'.join(additions) if additions else '') + '/tickers_' + '_'.join(['ms', 'zr'] + additions) + '_' + date + '.pckl', 'wb') # date instead of datetime.now() since process takes a while can extend into next day when data is not for the next day
+def save_tickers_yf_and_fmp_data(df_tickers, date, additions=[]): # date is in format '%Y-%m-%d' # ms_zr_
+    f = open('data/stocks/saved_tickers_data/' + 'usa_alpaca_by_yf_and_fmp' + ('_and_' + '_'.join(additions) if additions else '') + '/tickers_' + '_'.join(['ms', 'zr'] + additions) + '_' + date + '.pckl', 'wb') # date instead of datetime.now() since process takes a while can extend into next day when data is not for the next day
     pd.to_pickle(df_tickers, f)
     f.close()
 
-def save_tickers_gainers_data(df_tickers, date, additions=[]): # date is in format '%Y-%m-%d'
-    f = open('data/stocks/saved_tickers_data/' + 'usa_gainers' + ('_and_' + '_'.join(additions) if additions else '') + '/tickers_' + '_'.join(additions) + '_' + date + '.pckl', 'wb') # date instead of datetime.now() since process takes a while can extend into next day when data is not for the next day
+def save_tickers_daily_gainers_fmp(df_tickers, date, additions=[]): # date is in format '%Y-%m-%d'
+    f = open('data/stocks/saved_tickers_data/' + 'usa_gainers_fmp' + ('_and_' + '_'.join(additions) if additions else '') + '/tickers_' + '_'.join(additions) + '_' + date + '.pckl', 'wb') # date instead of datetime.now() since process takes a while can extend into next day when data is not for the next day
     pd.to_pickle(df_tickers, f)
     f.close()
 
-def save_usa_alpaca_by_fmp_tickers_ms_zr_data(date): # maybe refactor and take away ms since not showing up most of time # date is in format '%Y-%m-%d'
-    df_usa_alpaca_by_fmp_tickers_z = pd.DataFrame(columns = ['Name (Alpaca)', 'ID (Alpaca)', 'Exchange (Alpaca)', 'Shortable (Alpaca)', 'Easy to Borrow (Alpaca)', 'Class (Alpaca)', 'Asset Type', 'Market Cap', 'Sector', 'Industry', 'CEO', 'Website', '# Employees', 'Location', 'Last', 'Volume', 'P/E (TTM)', 'Forward P/E', 'P/S (TTM)', 'Basic EPS (FY)', 'PEG Ratio (TTM)', 'Div Yield (FY)', 'P/B (TTM)', 'EBITDA', 'EV/EBITDA (TTM)', 'D/E (TTM)', 'Net Income Ratio', 'Revenue (Past 5 years)', 'Gross Profit Ratio (Past 5 years)', 'Total Assets (Past 5 years)', 'Total Liabilities (Past 5 years)', 'Cash and Cash Equivalents (Past 5 years)', 'Long-Term Debt (Past 5 years)', 'Past 5 years', 'Beta', 'Short of Float Ratio', 'Short Ratio', 'Day range', 'Year range', '200D Avg', '50D Avg', 'Morningstar Rating', 'Held by Institutions Ratio', 'Held by Insiders Ratio', 'FMP Rank', 'FMP Rank Date', 'Zacks Rank', 'Zacks Updated At']).astype({'Name (Alpaca)': 'object', 'ID (Alpaca)': 'object', 'Exchange (Alpaca)': 'object', 'Shortable (Alpaca)': 'bool', 'Easy to Borrow (Alpaca)': 'bool', 'Class (Alpaca)': 'object', 'Asset Type': 'object', 'Market Cap': 'float64', 'Sector': 'object', 'Industry': 'object', 'CEO': 'object', 'Website': 'object', '# Employees': 'float64', 'Location': 'object', 'Last': 'float64', 'Volume': 'float64', 'P/E (TTM)': 'float64', 'Forward P/E': 'float64', 'P/S (TTM)': 'float64', 'Basic EPS (FY)': 'float64', 'PEG Ratio (TTM)': 'float64', 'Div Yield (FY)': 'float64', 'P/B (TTM)': 'float64', 'EBITDA': 'float64', 'EV/EBITDA (TTM)': 'float64', 'D/E (TTM)': 'float64', 'Net Income Ratio': 'float64', 'Revenue (Past 5 years)': 'object', 'Gross Profit Ratio (Past 5 years)': 'object', 'Total Assets (Past 5 years)': 'object', 'Total Liabilities (Past 5 years)': 'object', 'Cash and Cash Equivalents (Past 5 years)': 'object', 'Long-Term Debt (Past 5 years)': 'object', 'Past 5 years': 'object', 'Beta': 'float64', 'Short of Float Ratio': 'float64', 'Short Ratio': 'float64', 'Day range': 'object', 'Year range': 'object', '200D Avg': 'float64', '50D Avg': 'float64', 'Morningstar Rating': 'float64', 'Held by Institutions Ratio': 'float64', 'Held by Insiders Ratio': 'float64', 'FMP Rank': 'float64', 'FMP Rank Date': 'datetime64[ns]', 'Zacks Rank': 'float64', 'Zacks Updated At': 'datetime64[ns]'}) # maybe refactor and add columns which measure other KPIs, like in save_usa_by_tv_tickers_zr_data, "S&P 500 Rank"
+def save_usa_alpaca_tickers_fmp_data(date): # maybe refactor and take away ms since not showing up most of time # date is in format '%Y-%m-%d'
+    df_usa_alpaca_tickers_fmp_ms_zr_data = pd.DataFrame(columns = ['Name (Alpaca)', 'ID (Alpaca)', 'Exchange (Alpaca)', 'Shortable (Alpaca)', 'Easy to Borrow (Alpaca)', 'Class (Alpaca)', 'Asset Type', 'Market Cap', 'Sector', 'Industry', 'CEO', 'Website', '# Employees', 'Location', 'Last', 'Volume', 'P/E (TTM)', 'Forward P/E', 'P/S (TTM)', 'Basic EPS (FY)', 'PEG Ratio (TTM)', 'Div Yield (FY)', 'P/B (TTM)', 'EBITDA', 'EV/EBITDA (TTM)', 'D/E (TTM)', 'Net Income Ratio', 'Revenue (Past 5 years)', 'Gross Profit Ratio (Past 5 years)', 'Total Assets (Past 5 years)', 'Total Liabilities (Past 5 years)', 'Cash and Cash Equivalents (Past 5 years)', 'Long-Term Debt (Past 5 years)', 'Past 5 years', 'Beta', 'Short of Float Ratio', 'Short Ratio', 'Day range', 'Year range', '200D Avg', '50D Avg', 'Morningstar Rating', 'Held by Institutions Ratio', 'Held by Insiders Ratio', 'FMP Rank', 'FMP Rank Date', 'Zacks Rank', 'Zacks Updated At']).astype({'Name (Alpaca)': 'object', 'ID (Alpaca)': 'object', 'Exchange (Alpaca)': 'object', 'Shortable (Alpaca)': 'bool', 'Easy to Borrow (Alpaca)': 'bool', 'Class (Alpaca)': 'object', 'Asset Type': 'object', 'Market Cap': 'float64', 'Sector': 'object', 'Industry': 'object', 'CEO': 'object', 'Website': 'object', '# Employees': 'float64', 'Location': 'object', 'Last': 'float64', 'Volume': 'float64', 'P/E (TTM)': 'float64', 'Forward P/E': 'float64', 'P/S (TTM)': 'float64', 'Basic EPS (FY)': 'float64', 'PEG Ratio (TTM)': 'float64', 'Div Yield (FY)': 'float64', 'P/B (TTM)': 'float64', 'EBITDA': 'float64', 'EV/EBITDA (TTM)': 'float64', 'D/E (TTM)': 'float64', 'Net Income Ratio': 'float64', 'Revenue (Past 5 years)': 'object', 'Gross Profit Ratio (Past 5 years)': 'object', 'Total Assets (Past 5 years)': 'object', 'Total Liabilities (Past 5 years)': 'object', 'Cash and Cash Equivalents (Past 5 years)': 'object', 'Long-Term Debt (Past 5 years)': 'object', 'Past 5 years': 'object', 'Beta': 'float64', 'Short of Float Ratio': 'float64', 'Short Ratio': 'float64', 'Day range': 'object', 'Year range': 'object', '200D Avg': 'float64', '50D Avg': 'float64', 'Morningstar Rating': 'float64', 'Held by Institutions Ratio': 'float64', 'Held by Insiders Ratio': 'float64', 'FMP Rank': 'float64', 'FMP Rank Date': 'datetime64[ns]', 'Zacks Rank': 'float64', 'Zacks Updated At': 'datetime64[ns]'}) # maybe refactor and add columns which measure other KPIs, like in save_usa_tv_tickers_zacks_data, "S&P 500 Rank"
     count = 0
     for asset in _fetch_data(alpaca_api.list_assets, params={}, error_str=" - No listed assets from Alpaca on: " + str(datetime.now()), empty_data = []): # since only about 1/2-2/3 of alpaca assets are adequate (have market cap data), can use scrape to get adequate assets from a site that allows scraping # alpaca assets (organization / order in which listed) data changed on 2021-03-12, but possibly corrected on 2021-03-16
         ticker = asset.symbol # not using upper() as precautionary, should already be in upper
-        # if ticker in df_usa_alpaca_by_fmp_tickers_z.index:
+        # if ticker in df_usa_alpaca_tickers_fmp_ms_zr_data.index:
         #     continue
         if asset.tradable == False: # maybe refactor and add asset.shortable == False, tradable same as as status
             continue
@@ -600,7 +600,7 @@ def save_usa_alpaca_by_fmp_tickers_ms_zr_data(date): # maybe refactor and take a
             # if None in [ticker_data_detailed['price']['marketCap'], ticker_data_detailed['price']['regularMarketPrice'], ticker_data_detailed['price']['regularMarketVolume'], ticker_data_detailed['defaultKeyStatistics']['trailingEps'], ticker_data_detailed['defaultKeyStatistics']['priceToBook']]:
                 # continue
             # maybe add 'bid', 'sharesOutstanding', something regarding Sales/Revenue like ['defaultKeyStatistics']['enterpriseToRevenue'], something regarding ratings trend like ['recommendationTrend']['trend'], something regarding liquidity like current ratio, ['defaultKeyStatistics']['profitMargins'] # maybe take out 'eps' or 'p/e' one can be derived from the other and add (5 yr expected to PEG), 'ev/ebitda' since issue with ev value (compared to Yahoo Finance) # useful values from finance.yahoo.com/quote/' + ticker: '1y target EST', 'Earnings Date', 'Avg. Volume', "Day's Range", might be able to get more values like D/E and P/FCF in javascript section of page # not using Yahoo Finance EV since it is a quite a bit larger than TradingView
-            df_usa_alpaca_by_fmp_tickers_z.loc[ticker] = [
+            df_usa_alpaca_tickers_fmp_ms_zr_data.loc[ticker] = [
                 asset.name,
                 asset.id,
                 asset.exchange,
@@ -651,9 +651,9 @@ def save_usa_alpaca_by_fmp_tickers_ms_zr_data(date): # maybe refactor and take a
                 None # zacks_updated_at # , #
             ]
         except Exception as e:
-            print(str(e) + " - No (or issue with) ticker data detailed FMP or zacks data for ticker: " + ticker + " on exchange: " + asset.exchange + " on: " + str(datetime.now()) + ", Execution time: " + str(time.time() - start_time))
-    save_tickers_ms_zr_data(df_usa_alpaca_by_fmp_tickers_z, date)
-    return df_usa_alpaca_by_fmp_tickers_z
+            print(str(e) + " - No (or issue with) ticker data detailed FMP for ticker: " + ticker + " on exchange: " + asset.exchange + " on: " + str(datetime.now()) + ", Execution time: " + str(time.time() - start_time)) # or zacks data
+    save_tickers_yf_and_fmp_data(df_usa_alpaca_tickers_fmp_ms_zr_data, date)
+    return df_usa_alpaca_tickers_fmp_ms_zr_data
 
 from unidecode import unidecode
 from fake_headers import Headers
@@ -698,7 +698,7 @@ def crunchbase_check_ticker_and_permalink(ticker, permalink, retry=True, **param
 
 from random import randint
 
-def get_crunchbase_user_data_for_ticker(ticker, permalink_original, **params): # company is lowercase string like 'asana' # old name - get_crunchbase_user_data_for_company_with_ticker() # apply same logic in save_usa_alpaca_by_fmp_tickers_ms_zr_data() function with its own counter (separate from yahoo finance counter) # maybe refactor and remove resp.status_code from return [data, resp.status_code]
+def get_crunchbase_user_data_for_ticker(ticker, permalink_original, **params): # company is lowercase string like 'asana' # old name - get_crunchbase_user_data_for_company_with_ticker() # apply same logic in save_usa_alpaca_tickers_fmp_data() function with its own counter (separate from yahoo finance counter) # maybe refactor and remove resp.status_code from return [data, resp.status_code]
     print("<<< " + ticker + " >>>")
     data = {} # not needed but consistent with other functions # permalink_original, permalink,
     [permalink, resp_status_code], idx = crunchbase_check_ticker_and_permalink(ticker=ticker, permalink=permalink_original, **params), 0
@@ -1531,7 +1531,7 @@ def run_portfolio_top_n_gainers_ai_analysis(portfolio, start_day=None, end_day=N
                 df_tickers_interval_stop = df_tickers_interval_stop[df_tickers_interval_stop['Market Cap'] > 0].sort_values('Market Cap', ascending=False, inplace=False)
                 df_tickers_daily_gainers = _fetch_data(get_daily_stock_gainers_fmp, params={}, error_str=" - Issues with stock gainers from FMP on: " + str(datetime.now()), empty_data = pd.DataFrame())
                 if not back_testing:
-                    save_tickers_gainers_data(df_tickers_daily_gainers, stop_day.strftime('%Y-%m-%d'))
+                    save_tickers_daily_gainers_fmp(df_tickers_daily_gainers, stop_day.strftime('%Y-%m-%d'))
                 if not (df_tickers_interval_stop.empty or df_tickers_daily_gainers.empty):
                     # refactor and add logic for dealing with if zacks rank is in  df_tickers_interval_start/stop
                     tickers_to_buy, tickers_to_sell = [], [] # Counter(), Counter()
@@ -1906,7 +1906,7 @@ def portfolio_trading(portfolio, paper_trading=True, paper_trading_on_used_accou
                 todays_date = datetime.now() # no need to change to 13:00:00 time since fmp calls take the date in simple string format (no %H:%M:%S): datetime_object.strftime('%Y-%m-%d')
                 df_tickers_interval_today = get_saved_tickers_data(date=todays_date.strftime('%Y-%m-%d'))
                 if df_tickers_interval_today.empty and download_and_save_tickers_data:
-                    save_usa_alpaca_by_fmp_tickers_ms_zr_data(date=todays_date.strftime('%Y-%m-%d')) # maybe refactor (especially if in timezone far off eastern), not using eastern since run late at night and could extend into next day (in eastern time)
+                    save_usa_alpaca_tickers_fmp_data(date=todays_date.strftime('%Y-%m-%d')) # maybe refactor (especially if in timezone far off eastern), not using eastern since run late at night and could extend into next day (in eastern time)
                 else:
                     # df_tickers_interval_today = get_saved_tickers_data(date=todays_date.strftime('%Y-%m-%d'))
                     while df_tickers_interval_today.empty:
