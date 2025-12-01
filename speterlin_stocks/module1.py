@@ -7,6 +7,8 @@
 # twilio_phone_from = None
 # portfolio_account = None # maybe add portfolio_name later for more consistent logic
 
+
+# unused since not 'from .module1 import *' in __init__.py
 __all__ = [
     "_fetch_data",
     "trendline",
@@ -26,25 +28,25 @@ __all__ = [
     # "get_ticker_data_detailed_gfinance"
     # "get_ticker_data_detailed_yfinance"
     # "openai_functions", # array of functions
-    "get_investment_recommendation",
-    "get_investment_recommendation_2",
+    "extract_investment_recommendation",
+    "extract_investment_recommendation_2",
     # "should_I_buy_the_stock_openai"
     "should_I_buy_the_stock_google_gemini_pro",
-    "get_google_trends", # replaces "get_cryptory",
+    "get_google_trends_pt", # replaces "get_cryptory",
     "get_saved_tickers_data",
     # "save_usa_tv_tickers_zacks_data"
     "save_tickers_yf_and_fmp_data",
     "save_tickers_daily_gainers_fmp",
     "save_usa_alpaca_tickers_fmp_data",
-    # "crunchbase_search_permalinks",
-    # "crunchbase_check_ticker_and_permalink"
-    # "get_crunchbase_user_data_for_ticker"
+    # "get_crunchbase_search_permalinks",
+    # "get_crunchbase_permalink_site_check_ticker"
+    # "get_crunchbase_data_for_ticker"
     "alpaca_trade_ticker",
     "get_alpaca_assets",
     "fmp_check_24h_vol",
     "update_portfolio_postions_back_testing",
     "update_portfolio_buy_and_sell_tickers",
-    # "tickers_with_stock_splits_in_day_yfinance",
+    # "get_tickers_with_stock_splits_in_day_yfinance",
     # "tickers_with_stock_splits_in_period_yfinance",
     "get_sp500_ranked_tickers_by_marketbeat",
     "run_portfolio",
@@ -56,7 +58,7 @@ __all__ = [
     "run_portfolio_mm",
     "run_portfolio_ai_recommendations_in_sector",
     "run_portfolio_top_n_gainers_ai_analysis",
-    "get_senate_timestamps_and_tickers_inflows_and_outflows_by_month_for_stocks",
+    "senate_timestamps_and_tickers_inflows_and_outflows_by_month_for_stocks",
     "run_portfolio_senate_trading",
     "run_portfolio_sma_mm",
     "portfolio_align_prices_with_alpaca",
@@ -295,24 +297,24 @@ def get_ticker_data_detailed_gfinance(ticker, exchange):
     last = float(soup.find('div', {'class': 'AHmHk'}).text.strip().replace('$',"").replace(',',""))
     divs = soup.findAll('div', {'class': 'gyFHrc'}) # divs = soup.find('div', {'class': 'eYanAe'}).findAll('div')
     data, times_table = {'Last': last}, {'T': 1e12, 'B': 1e9, 'M': 1e6, 'K': 1e3}
-    exchange_rates_usd = _fetch_data(get_exchange_rates_usd, params={}, error_str=" - No Exchange Rates (USD) on: " + str(datetime.now()), empty_data = {})
+    exchange_rates_usd = _fetch_data(get_exchange_rates_exchangerate, params={'base_currency': 'USD'}, error_str=" - No Exchange Rates (USD) from ExchangeRate-api on: " + str(datetime.now()), empty_data = {})
     for div in divs:
         # print(div.text)
-        current_string = div.find('div', {'class': 'mfs7Fc'}).text.strip()
-        if current_string in ['Market cap', 'Avg Volume']:
+        current_label = div.find('div', {'class': 'mfs7Fc'}).text.strip()
+        if current_label in ['Market cap', 'Avg Volume']:
             current_value_text = div.find('div', {'class': 'P6K39c'}).text.strip().split(" ")[0] # maybe refactor and add .replace('$',"").replace(',',"").replace(' ',"")
             try:
                 current_value = float(current_value_text[:-1]) * times_table[current_value_text[-1]]
             except:
                 current_value = float(current_value_text)
-            if current_string in ['Market cap']:
+            if current_label in ['Market cap']:
                 currency = div.find('div', {'class': 'P6K39c'}).text.strip().split(" ")[1] #
                 if currency != 'USD':
                     current_value = current_value / float(exchange_rates_usd[currency]) if currency in exchange_rates_usd else float("NaN") # float(exchange_rates_usd[currency]) precautionary exchange_rates_usd[currency] is int
-        elif current_string in ['CEO', 'Headquarters']:
+        elif current_label in ['CEO', 'Headquarters']:
             current_value = ", ".join(div.find('div', {'class': 'P6K39c'}).get_text(strip=True, separator='\n').split("\n"))
             # current_value = div.find('div', {'class': 'P6K39c'}).get_text(strip=True, separator='br').splitlines()
-        elif current_string in ['Founded']:
+        elif current_label in ['Founded']:
             try:
                 current_value = datetime.strptime(div.find('div', {'class': 'P6K39c'}).text.strip(), '%b %d, %Y')
             except:
@@ -322,14 +324,14 @@ def get_ticker_data_detailed_gfinance(ticker, exchange):
                     current_value = datetime.strptime(div.find('div', {'class': 'P6K39c'}).text.strip(), '%b %Y')
         else:
             current_value = div.find('div', {'class': 'P6K39c'}).text.strip().replace('$',"").replace(',',"").replace(' ',"").replace('%',"")
-            current_value = float("NaN") if current_value in ["∞", "-", "--", "No Data", "No"] else float(current_value)/100.0 if current_string in ['Dividend yield'] else float(current_value) if current_string in ['Previous close', 'P/E ratio', 'Employees'] else current_value #
-        data[current_string] = current_value
+            current_value = float("NaN") if current_value in ["∞", "-", "--", "No Data", "No"] else float(current_value)/100.0 if current_label in ['Dividend yield'] else float(current_value) if current_label in ['Previous close', 'P/E ratio', 'Employees'] else current_value #
+        data[current_label] = current_value
     data['EPS (TTM)'] = (1 / data['P/E ratio']) * last if 'P/E ratio' in data else float("NaN") # P/E is using TTM assuming it's basic earnings
     return data
 
 def get_ticker_data_detailed_yfinance(ticker, options={'engaged': False, 'type': 'key-statistics'}, additional_page={'engaged': False, 'type': 'profile'}): # maybe refactor to incorporate multiple options # 'financials' # financial options doesn't include 'summaryProfile', 'defaultKeyStatistics', 'financialData'
     headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10 7 4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'} # {'User-Agent': 'Mozilla/4.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'} # maybe refactor here and below, might change header to something else but doesn't matter just tricking the server (fighting bots / crawlers) into thinking it's a browser making the request, header is from https://stackoverflow.com/questions/68259148/getting-404-error-for-certain-stocks-and-pages-on-yahoo-finance-python
-    site_url = 'https://finance.yahoo.com/quote/' + ticker + '/' + (options['type'] if options['engaged'] else '') # https://finance.yahoo.com/quote/TSLA/key-statistics?p=TSLA&.tsrc=fin-srch
+    site_url = 'https://finance.yahoo.com/quote/' + ticker + '/' # https://finance.yahoo.com/quote/TSLA/key-statistics?p=TSLA&.tsrc=fin-srch
     resp = requests.get(site_url, headers=headers) # , auth=(username, password)) # maybe add timeout=50 to avoid unsolved_error (see requests documentation)
     soup = bs.BeautifulSoup(resp.text, 'html.parser')
     # div_main = soup.find('div', {'class': 'Mstart(a) Mend(a)'})
@@ -338,38 +340,54 @@ def get_ticker_data_detailed_yfinance(ticker, options={'engaged': False, 'type':
     #     if span.string: # and (len(script.string) > max_script['length']): # can't use .text after bs.__version__ > 4.8.0
     #         # max_script['length'], max_script['idx'] = len(script.string), idx # print(str(idx) +  ": " + td.string) # print(str(idx) +  ": " + td.string)", len: " + str(len(script.string)) + ", first 100 characters: " + script.string[:100] + ", last 100 characters: " + script.string[-100:])
     #         if span.string not in ['Valuation Measures', 'Financial Highlights', ...]:
-    tds = soup.find_all('td')
-    last = float(soup.find('div', {'class': 'D(ib) Mend(20px)'}).find_all('fin-streamer')[0].string.replace(',', ""))
-    data, times_table, current_string = {'Last': last}, {'T': 1e12, 'B': 1e9, 'M': 1e6, 'K': 1e3}, None
-    for idx,td in enumerate(tds):
-        if td.string: # and (len(script.string) > max_script['length']): # can't use .text after bs.__version__ > 4.8.0
-            # max_script['length'], max_script['idx'] = len(script.string), idx # print(str(idx) +  ": " + td.string) # print(str(idx) +  ": " + td.string)", len: " + str(len(script.string)) + ", first 100 characters: " + script.string[:100] + ", last 100 characters: " + script.string[-100:])
+    div_quote_statistics = soup.find('div', {'data-testid': 'quote-statistics'})
+    lis = div_quote_statistics.find_all('li')
+    data, times_table, current_label = {}, {'T': 1e12, 'B': 1e9, 'M': 1e6, 'K': 1e3}, None # 'Last': last
+    for idx,li in enumerate(lis):
+        if li.text: # and (len(script.string) > max_script['length']): # can't use .text after bs.__version__ > 4.8.0
+            # max_script['length'], max_script['idx'] = len(script.string), idx # print(str(idx) +  ": " + li.string) # print(str(idx) +  ": " + li.string)", len: " + str(len(script.string)) + ", first 100 characters: " + script.string[:100] + ", last 100 characters: " + script.string[-100:])
             try:
-                if current_string != 'Market Cap':
-                    current_value = float(td.string.replace(',',""))
+                spans = li.find_all('span')
+                current_label = spans[0]['title'].strip()
+                current_value_text = spans[1].string.strip()
+                if current_label in ['Previous Close', 'Open', 'Volume', 'Avg. Volume', 'Beta (5Y Monthly)', 'PE Ratio (TTM)', 'EPS Ratio (TTM)', '1y Target Est']:
+                    current_value = float(current_value_text.replace(',',""))
+                elif current_label in ['Market Cap (intraday)']:
+                    current_value = float(re.split('[a-zA-Z]', current_value_text)[0]) * times_table[current_value_text[-1]]
+                elif current_label in ['Forward Dividend & Yield']:
+                    current_label = 'Forward Dividend' # on it's own line so that current_label is established before potential error
+                    current_value = float(current_value_text.split(" ")[0])
+                elif current_label in ['Earnings Date', 'Ex-Dividend Date']:
+                    current_value = datetime.strptime(current_value_text, '%b %d, %Y')
                 else:
-                    current_value = float(re.split('[a-zA-Z]+', td.string)[0]) * times_table[td.string[-1]]
-                data[current_string] = current_value
+                    current_value = current_value_text.replace(',',"")
             except Exception as e:
-                current_string = td.string
-    if additional_page['engaged']:
-        site_url = 'https://finance.yahoo.com/quote/' + ticker + '/' + (additional_page['type'])
+                if current_value_text in ["∞", "-", "--", "No Data", "No"]:
+                    data[current_label] = float("NaN")
+                    continue
+                print(str(e) + " - Issue with spans for list idx: " + str(idx) + " and list item: " + str(li.text) + ", skipping list item for ticker: " + ticker)
+                continue
+            data[current_label] = current_value
+    # if options['engaged']: # need to complete / refactor
+        # site_url = 'https://finance.yahoo.com/quote/' + ticker + '/' + (options['engaged'])
+    if additional_page['engaged']: # need to refactor
+        site_url = 'https://finance.yahoo.com/quote/' + ticker + '/' + (additional_page['type']) + '/'
         resp = requests.get(site_url, headers=headers)
         soup = bs.BeautifulSoup(resp.text, 'html.parser')
         # div_profile = soup.find('div', {'class': 'Pos(r) Bgc($bg-content) Bgc($lv2BgColor)! Miw(1007px) Maw(1260px) tablet_Miw(600px)--noRightRail Bxz(bb) Bdstartc(t) Bdstartw(20px) Bdendc(t) Bdends(s) Bdendw(20px) Bdstarts(s) Mx(a)'}).find('div', {'class': 'Pt(10px) smartphone_Pt(20px) Lh(1.7)'})
-        spans_in_p_sector_industry_employees, current_string = soup.find('div', {'class': 'Pos(r) Bgc($bg-content) Bgc($lv2BgColor)! Miw(1007px) Maw(1260px) tablet_Miw(600px)--noRightRail Bxz(bb) Bdstartc(t) Bdstartw(20px) Bdendc(t) Bdends(s) Bdendw(20px) Bdstarts(s) Mx(a)'}).find('p', {'class': 'D(ib) Va(t)'}).find_all('span'), None
+        spans_in_p_sector_industry_employees, current_label = soup.find('div', {'class': 'Pos(r) Bgc($bg-content) Bgc($lv2BgColor)! Miw(1007px) Maw(1260px) tablet_Miw(600px)--noRightRail Bxz(bb) Bdstartc(t) Bdstartw(20px) Bdendc(t) Bdends(s) Bdendw(20px) Bdstarts(s) Mx(a)'}).find('p', {'class': 'D(ib) Va(t)'}).find_all('span'), None
         for idx,span in enumerate(spans_in_p_sector_industry_employees):
             if span.string and idx < 6: # and (len(script.string) > max_script['length']): # can't use .text after bs.__version__ > 4.8.0
                 # max_script['length'], max_script['idx'] = len(script.string), idx # print(str(idx) +  ": " + td.string) # print(str(idx) +  ": " + td.string)", len: " + str(len(script.string)) + ", first 100 characters: " + script.string[:100] + ", last 100 characters: " + script.string[-100:])
                 if idx%2 == 0:
-                    current_string = span.string.replace('(s)',"")
+                    current_label = span.string.replace('(s)',"")
                     if idx == 0 or idx == 6: # maybe refactor idx == 6 is redundant
                         continue
                 elif idx == 5:
                     current_value = float(span.string.replace(',',""))
                 else:
                     current_value = span.string
-                data[current_string] = current_value
+                data[current_label] = current_value
     return data
 
 openai_functions=[
@@ -410,7 +428,7 @@ openai_functions=[
         },
     },
     {
-        "name": "get_investment_recommendation",
+        "name": "extract_investment_recommendation",
         "description": "This will get the numeric investment recommendation on a scale of 1-10 for the OpenAI analysis of the company",
         "parameters": {
             "type": "object",
@@ -425,7 +443,7 @@ openai_functions=[
     }
 ]
 
-def get_investment_recommendation(analysis, ticker):
+def extract_investment_recommendation(analysis, ticker):
     start_time = time.time()
     try:
         rating = float(re.findall(r"[2-9]", re.split("[C|c]onclusion|[R|r]ecommend[ation]{0,1}|[O|o]verall", analysis.text)[-1])[0]) # maybe add ^ed for recommend |[R|r]at[e|ed|ing] # excluding 0,1,10 outliers (extremely low or high recommendation) # maybe refactor add rating|recommendation
@@ -437,7 +455,7 @@ def get_investment_recommendation(analysis, ticker):
     # rating = google_gemini_pro_model.generate_content(f"Given the Google Gemini Pro analysis, what is the numeric investment recommendation on a scale of 1-10 of the company stock ticker ?: {analysis.text}?")
     return rating
 
-def get_investment_recommendation_2(analysis, ticker):
+def extract_investment_recommendation_2(analysis, ticker):
     start_time = time.time()
     try:
         rating = float(re.findall(r"[2-9]", re.split(r"\srate\s|\srated\s|\srating\s", analysis.text)[-1])[0]) # \s[R|r]at[e|ed|ing]\s # [R|r]at[e|ed|ing] | # excluding 0,1,10 outliers (extremely low or high recommendation) # maybe refactor add rating|recommendation
@@ -450,7 +468,7 @@ def get_investment_recommendation_2(analysis, ticker):
     # rating = google_gemini_pro_model.generate_content(f"Given the Google Gemini Pro analysis, what is the numeric investment recommendation on a scale of 1-10 of the company stock ticker ?: {analysis.text}?")
     return rating
 
-def should_I_buy_the_stock_openai (analysis): # get_investment_recommendation_openai # , ai="google-gemini-pro"
+def should_I_buy_the_stock_openai (analysis): # extract_investment_recommendation_openai # , ai="google-gemini-pro"
     response = openai_client.chat.completions.create( # openai.ChatCompletion.create(
         model="gpt-4", # 3.5-turbo
         temperature=0,
@@ -459,7 +477,7 @@ def should_I_buy_the_stock_openai (analysis): # get_investment_recommendation_op
             "content":f"Given the OpenAI analysis, what is the numeric investment recommendation on a scale of 1-10 of the company stock ticker ?: {analysis.content}?" # f"Given the user request, what is the names of the competitor companies of the company and their ticker symbols ?: {query}?"
         }],
         functions=openai_functions,
-        function_call={"name": "get_investment_recommendation"}, # "get_company_competitors_and_their_tickers"
+        function_call={"name": "extract_investment_recommendation"}, # "get_company_competitors_and_their_tickers"
     )
     message = response.choices[0].message # response["choices"][0]["message"]
     arguments = json.loads(message.function_call.arguments)
@@ -506,7 +524,7 @@ def should_I_buy_the_stock_google_gemini_pro(ticker, company_name, location=None
 
 from pytrends.request import TrendReq
 
-def get_google_trends(kw_list, from_date, to_date, trend_days=270, cat=0, geo='', tz=480, gprop='', hl='en-US', isPartial_col=False, from_start=False, scale_cols=True): # trend_days max is around 270 # category to narrow results # geo e.g 'US', 'UK' # tz = timezone offset default is 360 which is US CST (UTC-6), PST is 480 (assuming UTC-8*60) # hl language default is en-US # gprop : filter results to specific google property like 'images', 'news', 'youtube' or 'froogle' # overlap=100, sleeptime=1, not doing multiple searches # other variables: timeout=(10,25), proxies=['https://34.203.233.13:80',], retries=2, backoff_factor=0.1, requests_args={'verify':False}
+def get_google_trends_pt(kw_list, from_date, to_date, trend_days=270, cat=0, geo='', tz=480, gprop='', hl='en-US', isPartial_col=False, from_start=False, scale_cols=True): # trend_days max is around 270 # category to narrow results # geo e.g 'US', 'UK' # tz = timezone offset default is 360 which is US CST (UTC-6), PST is 480 (assuming UTC-8*60) # hl language default is en-US # gprop : filter results to specific google property like 'images', 'news', 'youtube' or 'froogle' # overlap=100, sleeptime=1, not doing multiple searches # other variables: timeout=(10,25), proxies=['https://34.203.233.13:80',], retries=2, backoff_factor=0.1, requests_args={'verify':False}
     data = pd.DataFrame()
     if len(kw_list) != 1: # not doing multirange_interest_over_time: len(kw_list)==0 or len(kw_list)>5
         print("Error: The keyword list must be 1, not doing multirange_interest_over_time") # be > 0 and can contain at most 5 words
@@ -530,7 +548,7 @@ def get_google_trends(kw_list, from_date, to_date, trend_days=270, cat=0, geo=''
 # 04/24/2020 is first day with S&P 500 data (505 tickers) with Zacks Rank ordered alphabetically from Slickcharts (I believe), 04/28/2020 is first day with S&P 500 data (505 tickers) with Zacks Rank ordered by S&P 500 rank from Slickcharts, 05/08/2020 is first day with USA-listed stocks data (~4900 tickers) with Zacks Rank ordered by Market Cap Rank from TradingView, 07/21/2020 is first day with USA-listed tradable assets on Alpaca data (~6900 tickers) with Morningstar and Zacks Rank ordered by Alpaca from Yahoo Finance # some other nuances (like TradingView v2 data, incomplete Yahoo Finance data up until 07/24/2020, modifications/additions to Yahoo Finance data up until 08/07/2020), 10/16/2020 is first day with 'P/S (TTM)', 'EV' data, 10/30/2020 is first day with 'D/E (MRQ)', 05/13/2021 is first day with 'Forward P/E', 06/04/2021 is first day with 'P/E (TTM)' (could be derived in previous days) # 2020-05-18 is without zacks rank, issue, 2020-06-16 is a txt document with comma-seperated values but without zacks rank, 2020-10-30 and 2020-11-(02->05) missed a lot of tickers (~2325) since improper implementation of ticker_data_detailed['financialData'] (any ticker that has incomplete ticker_data_detailed['financialData'] is not recorded), 2020-07-21->2020-12-08 missed a lot of tickers (~400/day) since improper implementation of ticker_data_detailed['summaryDetail'], 10/30/2020->2021-01-05 missed some tickers (~10/day) since improper implementation of ticker_data_detailed['financialData'], 2020-12-02 and 2020-12-23 failed to save data due to requests error (2020-12-23 not sure) and 2021-03-02 saved late due to frozen Q all tickers after and including S have data from 2021-03-03 06:30 - 07:50, 2021-04-06->08 and 2021-07-07->08 no data downloaded because trips with Stephanie some reason not working, 2021-07-01->12 issue with anti-automation system (only downloaded 1/2 of tickers) fixed by adding header to fake as browser, 2021-09-08 frozen, 2021-10-04->06 frozen while on trip with Maja in Miami, 2021-10-19 wrote over when trying to download and save 2021-10-29 data, 2021-10-29 -> 2021-11-01 bad / duplicate (of 2021-10-28) data , 2021-11-04 froze, 2021-12-23->2022-01-03 & 2022-01-10->13 duplicate (at least the important) data, 2022-01-18 data is a bit corrupted since late save (mixed with 2022-01-19 06:30->09:22am data), 2022-01-26 & 2022-03-10 frozen, 2022-05-20->26 duplicate, 2022-10-31+ weird stuff happening with time.sleep() (sleeping for many minutes / hours at a time) & downloading (download pausing for hours at a time, taking 5x as long etc) and saving data (like save_portfolio_backup() saving to save_tickers_yf_and_fmp_data() location) with new Apple update (Mac OS 12.6.1) even after restarting etc, 2022-12-16->2022-12-29 yfinance updated their page so get_ticker_data_detailed_yfinance() doesn't pull the necessary data, 2023-01-03->2023-01-13 GOOG (maybe others) has (have) incorrect Market Cap $61B vs. $1.2T, 2023-10-31 switched to Google Finance data, 2023-11-16->17 no data downloaded because trip with Andreas some reason not working, 2023-12-01 switched to FMP data (upgraded in 2023-12-08 and 2024-01-12), 2025-01-23->24 GGAL issued 399RGT026 caused #get_alpaca_assets to crash
 def get_saved_tickers_data(date, category='all', rankings=['zr'], additions=[]): # date is a string in format '%Y-%m-%d', categories: 'sp500', 'usa_by_tv' # refactor rankings
     if category == 'all':
-        category = 'sp500' if datetime.strptime(date, '%Y-%m-%d').date() < datetime.strptime('2020-05-08', '%Y-%m-%d').date() else 'usa_by_tv' if datetime.strptime(date, '%Y-%m-%d').date() < datetime.strptime('2020-07-21', '%Y-%m-%d').date() else 'usa_alpaca_by_yf' + ('_and_' + '_'.join(additions) if additions else '') # '2020-08-08' # maybe refactor names usa_by_tv and usa_alpaca_by_yf names
+        category = 'sp500_by_sc' if datetime.strptime(date, '%Y-%m-%d').date() < datetime.strptime('2020-05-08', '%Y-%m-%d').date() else 'usa_by_tv' if datetime.strptime(date, '%Y-%m-%d').date() < datetime.strptime('2020-07-21', '%Y-%m-%d').date() else 'usa_alpaca_by_yf_and_fmp' + ('_and_' + '_'.join(additions) if additions else '') # '2020-08-08' # maybe refactor names usa_by_tv and usa_alpaca_by_yf names
         rankings = ['zr'] if datetime.strptime(date, '%Y-%m-%d').date() < datetime.strptime('2020-07-21', '%Y-%m-%d').date() else ['ms', 'zr'] # '2020-08-08' # ['ms'] if datetime.strptime(date, '%Y-%m-%d').date() <= datetime.strptime('2020-08-07', '%Y-%m-%d').date() else ['ms', 'zr'] # <= since '2020-08-07' is a Friday
     try:
         f = open('data/stocks/saved_tickers_data/' + category + '/tickers_' + '_'.join(rankings + additions) + '_' + date + '.pckl', 'rb')
@@ -658,7 +676,7 @@ def save_usa_alpaca_tickers_fmp_data(date): # maybe refactor and take away ms si
 from unidecode import unidecode
 from fake_headers import Headers
 
-def crunchbase_search_permalinks(permalink, **params):
+def get_crunchbase_search_permalinks(permalink, **params):
     # time.sleep(5) # since if return a long list (up to 25) will iterate over a long list will get json.decoder.JSONDecodeError: Expecting value: line 6 column 1 (char 5) error
     permalinks = [] # maybe refactor and change this (declaring empty function return / half of what function returns at beginning of function) in this function and below crunchbase functions
     site_url = "https://www.crunchbase.com/v4/data/autocompletes?query=" + "%20".join(permalink.split("-")) + "&collection_ids=organizations&limit=25&source=topSearch" # maybe refactor limit=25, permalink.split("-"/" ")
@@ -666,28 +684,30 @@ def crunchbase_search_permalinks(permalink, **params):
     resp = requests.get(site_url, headers=headers, cookies=cookies)
     soup = bs.BeautifulSoup(resp.text, 'html.parser')
     if (resp.status_code != 200) or not (soup and soup.text):
-        return [permalinks, resp.status_code]
+        data = [permalinks, resp.status_code]
+        print("Crunchbase search permalinks failed for permalink: " + permalink + " ; returning: " + str(data))
+        return data
     data = json.loads(soup.text) # assuming that this site_url returns a string in json format
     for entity in data['entities']:
         new_permalink = entity['identifier']['permalink']
         permalinks.append(new_permalink)
     return [permalinks, resp.status_code]
 
-def crunchbase_check_ticker_and_permalink(ticker, permalink, retry=True, **params): # old name - crunchbase_check_ticker_if_company_name_equals_permalink
+def get_crunchbase_permalink_site_check_ticker(ticker, permalink, retry=True, **params): # old name - crunchbase_check_ticker_if_company_name_equals_permalink
     data = []
     # time.sleep(randint(0, 3))
-    site_url = "https://www.crunchbase.com/organization/" + permalink # "-".join(company_name.split()) # permalink = "-".join(permalink.split()) # permalink should already be in 'name-name-name' format but if crunchbase_check_ticker_and_permalink() returns on first option then if multiple words it's a normal string 'name name'
+    site_url = "https://www.crunchbase.com/organization/" + permalink # "-".join(company_name.split()) # permalink = "-".join(permalink.split()) # permalink should already be in 'name-name-name' format but if get_crunchbase_permalink_site_check_ticker() returns on first option then if multiple words it's a normal string 'name name'
     headers, cookies = params['headers'] if ('headers' in params and params['headers']) else Headers(os="mac", headers=True).generate(), params['cookies'] if ('cookies' in params and params['cookies']) else {'cid': 'CihjF2EJua4XkgAtPH5jAg==', '_pxhd': 'IhifXsIJ7A98ehR9VBprDcS2R0QJLw7ZvwUY8CR9jpoQ3fvPaRezXrWDUfCcqC75orD5OSnwJYS1ZP1A9ieOqQ==:-teWJPV0KWw6Vvnu46qXzIor-OW/6skuVb7jq-NfX4yCB-PpRiHoi31hJLDhl9vQQvj7qfVoeGpVqjlXPiFQqX6rZ/ihiPQ72Z1oh0nv1SE=', '__cflb': '02DiuJLCopmWEhtqNz5agBnHnWotHyxG4jgU9FLJcAXuE'}
     resp = requests.get(site_url, headers=headers, cookies=cookies)
     soup = bs.BeautifulSoup(resp.text, 'html.parser')
     a_links = soup.find_all('a', {'class': 'link-primary'})
     if (resp.status_code != 200) or not a_links:  # not retrying requests since if fail usually fails after 9th try or so at which point the company probably doesn't exist on crunchbase (non-American company, other reasons) like AGMH or company is not worth searching for (not popular / queried enough) - when implemented only helped on SWCH (switch-6), CSCO (cisco), ICHR (ichor-systems), STNE (stone-pagamentos-sa), SREV (servicesource)
         data = [None, resp.status_code] # probably refactor quick fix
-        print(permalink + " ; " + str(data))
+        print("Crunchbase permalink site check ticker failed for ticker: " + ticker + " and permalink: " + permalink + " ; returning: " + str(data))
         return data
     a_link_text = unidecode(a_links[0].text)
     user_data_categories = ['Stock Symbol'] # , possibly add acquisitions, total funding amount
-    user_data_category = user_data_categories[0] # maybe refactor, to match get_crunchbase_user_data_for_ticker()
+    user_data_category = user_data_categories[0] # maybe refactor, to match get_crunchbase_data_for_ticker()
     ticker_from_site_url = re.search(user_data_category + ' (?:[a-zA-Z]+):[A-Z]{1,4}', a_link_text)[0].split()[-1].split(":")[-1] if re.search(user_data_category + ' (?:[a-zA-Z]+):[A-Z]{1,4}', a_link_text) else None # NYSE|NASDAQ|AMEX|ARCA|BATS NYSE|NASDAQ|AMEX|ARCA|BATS - leaves out exhances like Austria's VIE # .replace(',', '') # maybe refactor, precautionary not sure if need AMEX, ARCA, BATS (taken from Alpaca assets from saved tickers data)
     if ticker == ticker_from_site_url:
         data = [permalink, resp.status_code]
@@ -698,18 +718,19 @@ def crunchbase_check_ticker_and_permalink(ticker, permalink, retry=True, **param
 
 from random import randint
 
-def get_crunchbase_user_data_for_ticker(ticker, permalink_original, **params): # company is lowercase string like 'asana' # old name - get_crunchbase_user_data_for_company_with_ticker() # apply same logic in save_usa_alpaca_tickers_fmp_data() function with its own counter (separate from yahoo finance counter) # maybe refactor and remove resp.status_code from return [data, resp.status_code]
+def get_crunchbase_data_for_ticker(ticker, permalink_original, **params): # company is lowercase string like 'asana' # old name - get_crunchbase_user_data_for_company_with_ticker() # apply same logic in save_usa_alpaca_tickers_fmp_data() function with its own counter (separate from yahoo finance counter) # maybe refactor and remove resp.status_code from return [data, resp.status_code]
     print("<<< " + ticker + " >>>")
     data = {} # not needed but consistent with other functions # permalink_original, permalink,
-    [permalink, resp_status_code], idx = crunchbase_check_ticker_and_permalink(ticker=ticker, permalink=permalink_original, **params), 0
+    [permalink, resp_status_code], idx = get_crunchbase_permalink_site_check_ticker(ticker=ticker, permalink=permalink_original, **params), 0
     if not permalink:
         sleep_time = randint(3, 5) / 4
         print("Sleeping " + str(sleep_time) + "min before checking for new permalinks on: " + str(datetime.now()))
         time.sleep(sleep_time*60)
         params['headers'] = Headers(os="mac", headers=True).generate() if resp_status_code == 403 else params['headers']
-        [new_permalinks, resp_status_code] = crunchbase_search_permalinks(permalink=permalink_original, **params) # maybe refactor here and below and add while loop with Headers(os="mac", headers=True).generate()
+        [new_permalinks, resp_status_code] = get_crunchbase_search_permalinks(permalink=permalink_original, **params) # maybe refactor here and below and add while loop with Headers(os="mac", headers=True).generate()
+        print("New permalinks: " + str(new_permalinks) + " and resp status code: " + str(resp_status_code))
     while not permalink and idx < len(new_permalinks):
-        [permalink, resp_status_code], idx = crunchbase_check_ticker_and_permalink(ticker=ticker, permalink=new_permalinks[idx], **params), idx + 1 # maybe refactor - if company name does not match ticker or get a 404 error then add words related to company bio/sector/industry (possibly from yahoo finance 'company profile': 'company was formerly known as ..., Inc.'), like -motors (for TSLA) and -computing (for snowflake)
+        [permalink, resp_status_code], idx = get_crunchbase_permalink_site_check_ticker(ticker=ticker, permalink=new_permalinks[idx], **params), idx + 1 # maybe refactor - if company name does not match ticker or get a 404 error then add words related to company bio/sector/industry (possibly from yahoo finance 'company profile': 'company was formerly known as ..., Inc.'), like -motors (for TSLA) and -computing (for snowflake)
     if not permalink:
         print("Returning empty dict since permalink check failed for ticker: " + ticker + " and original permalink: " + permalink_original + " on: " + str(datetime.now()))
         return [data, resp_status_code]
@@ -868,7 +889,7 @@ def update_portfolio_postions_back_testing(portfolio, stop_day, end_day, **param
                 if END_DAY_OPEN_POSITIONS_FMP_24H_VOL:
                     portfolio['open'].loc[ticker, 'fmp_24h_vol'] = ticker_data_granular['volume'].sum() # maybe refactor, not exact but close, with last row error for previous days during current market hours last row has 0 volume in all cases observed so shouldn't be an issue
                 if END_DAY_OPEN_POSITIONS_GTRENDS_15D:
-                    google_trends = _fetch_data(get_google_trends, params={'kw_list': [ticker], 'from_date': stop_day - timedelta(days=15), 'to_date': stop_day}, error_str=" - No " + "google trends" + " data for ticker search term: " + ticker + " from: " + str(stop_day - timedelta(days=15)) + " to: " + str(stop_day), empty_data=pd.DataFrame())
+                    google_trends = _fetch_data(get_google_trends_pt, params={'kw_list': [ticker], 'from_date': stop_day - timedelta(days=15), 'to_date': stop_day}, error_str=" - No " + "google trends" + " data for ticker search term: " + ticker + " from: " + str(stop_day - timedelta(days=15)) + " to: " + str(stop_day), empty_data=pd.DataFrame())
                     google_trends_slope = trendline(google_trends.sort_values('date', inplace=False, ascending=True)[ticker]) if not google_trends.empty else float("NaN") # sort_values is precautionary, should already be ascending:  # , reverse_to_ascending=True
                     portfolio['open'].loc[ticker, 'gtrends_15d'] = google_trends_slope
             if not tsl_or_sl:
@@ -914,7 +935,7 @@ def update_portfolio_buy_and_sell_tickers(portfolio, tickers_to_buy, tickers_to_
                     buy_date = datetime.now() # price last_trade_data.price if last_trade_data else None, # maybe refactor and use yahoo finance price if last_trade_data fails # sell_price ticker_data.iloc[-1]['Adj Close']
                 if BUY_DATE_GTRENDS_15D:
                     # using Pytrends (Cryptory is deprecated doesn't work after Python 3.6-3.8) since good data and can retrieve other metrics like reddit subscribers, exchange rates, metal prices
-                    google_trends = _fetch_data(get_google_trends, params={'kw_list': [ticker], 'from_date': stop_day - timedelta(days=15), 'to_date': stop_day}, error_str=" - No " + "google trends" + " data for ticker search term: " + ticker + " from: " + str(stop_day - timedelta(days=15)) + " to: " + str(stop_day), empty_data=pd.DataFrame())
+                    google_trends = _fetch_data(get_google_trends_pt, params={'kw_list': [ticker], 'from_date': stop_day - timedelta(days=15), 'to_date': stop_day}, error_str=" - No " + "google trends" + " data for ticker search term: " + ticker + " from: " + str(stop_day - timedelta(days=15)) + " to: " + str(stop_day), empty_data=pd.DataFrame())
                     google_trends_slope = trendline(google_trends.sort_values('date', inplace=False, ascending=True)[ticker]) if not google_trends.empty else float("NaN") # sort_values is precautionary, should already be ascending:  # , reverse_to_ascending=True
                 else:
                     google_trends_slope = 0
@@ -922,7 +943,7 @@ def update_portfolio_buy_and_sell_tickers(portfolio, tickers_to_buy, tickers_to_
                 portfolio['open'].loc[ticker, ['position', 'balance', 'buy_date', 'buy_price', 'current_date', 'current_price', 'current_roi', 'fmp_24h_vol', 'gtrends_15d', 'rank_rise_d', 'tsl_armed', 'trade_notes']] = [('long' if not paper_trading else 'long-p'), quantity] + [buy_date, price]*2 + [0, fmp_24h_vol, google_trends_slope, rank_rise_d, False, trade_notes] # assuming buying at ~20 PST which means order gets executed at start of day next day every day # maybe refactor 'long-p' - alpaca
     return portfolio
 
-def tickers_with_stock_splits_in_day_yfinance(date, tickers_for_period): # date is a string in format '%Y-%m-%d' (example: '2021-03-12')
+def get_tickers_with_stock_splits_in_day_yfinance(date, tickers_for_period): # date is a string in format '%Y-%m-%d' (example: '2021-03-12')
     tickers = {} # , random_int , randint(0, 100)
     headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10 7 4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'} # {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'}
     # if random_int % 20 == 0:
@@ -959,7 +980,7 @@ def tickers_with_stock_splits_in_period_yfinance(start_day, **params): # no end 
         if count % 40 == 0: # maybe refactor take out since unlikely this will hit: 2000/365: 5.47 years
             print("Sleeping 7min every 40 requests on: " + str(datetime.now()))
             time.sleep(7*60)
-        tickers_for_day = _fetch_data(tickers_with_stock_splits_in_day_yfinance, params={'date': stop_day.strftime('%Y-%m-%d'), 'tickers_for_period': tickers_for_period}, error_str=" - No (or issue with) tickers with stock splits on date: " + str(stop_day) + ", on: " + str(datetime.now()), empty_data={})
+        tickers_for_day = _fetch_data(get_tickers_with_stock_splits_in_day_yfinance, params={'date': stop_day.strftime('%Y-%m-%d'), 'tickers_for_period': tickers_for_period}, error_str=" - No (or issue with) tickers with stock splits on date: " + str(stop_day) + ", on: " + str(datetime.now()), empty_data={})
         tickers_for_period = {**tickers_for_period, **tickers_for_day}
         stop_day = stop_day + timedelta(days=1)
         while stop_day.weekday() > 4 or (stop_day.replace(hour=0, minute=0, second=0, microsecond=0) in usa_holidays): # interval_start_date/stop_day in usa_holidays # stop_day = (stop_day + timedelta(days=1)) if (stop_day.weekday() < 4) else (stop_day + timedelta(days=7-stop_day.weekday())) # to avoid weekends, refactor to avoid holidays (2020-05-25)
@@ -1293,7 +1314,7 @@ def run_portfolio_random_sp500(portfolio, start_day=None, end_day=None, random_s
     end_day = end_day if end_day else datetime.now().replace(hour=13, minute=0, second=0, microsecond=0) # maybe refactor, markets are from 9:30 - 16:00 EST / 6:30 - 13:00 EST
     start_day = start_day if start_day else end_day - timedelta(days=DAYS)
     stop_day = start_day + timedelta(days=DAYS)
-    df_tickers_sp500 = params['df_tickers_sp500'] if 'df_tickers_sp500' in params else _fetch_data(get_sp500_ranked_tickers_by_marketbeat, params={}, error_str=" - No s&p 500 tickers data from Market Beat on: " + str(datetime.now()), empty_data = pd.DataFrame()) # assuming s&p500 hasn't changed since start_day
+    df_tickers_sp500 = params['df_tickers_sp500'] if 'df_tickers_sp500' in params else _fetch_data(get_sp500_ranked_tickers_by_marketbeat, params={}, error_str=" - No s&p 500 tickers data from MarketBeat on: " + str(datetime.now()), empty_data = pd.DataFrame()) # assuming s&p500 hasn't changed since start_day
     if df_tickers_sp500.empty: # df_tickers_sp500.empty - precautionary should never be empty # df_tickers_interval_start.empty or df_tickers_interval_stop.empty or  # df_tickers_interval_stop.empty
         print("Error no df_tickers_sp500 cannot perform algorithm")
         return portfolio
@@ -1473,8 +1494,8 @@ def run_portfolio_ai_recommendations_in_sector(portfolio, start_day=None, end_da
                         try:
                             # maybe refactor inside of a try statement no need for _fetch_data()
                             buy_or_not_analysis = should_I_buy_the_stock_google_gemini_pro(ticker, company_name, location) # f"Is it a good time to buy {company_name}?"
-                            rating = get_investment_recommendation(buy_or_not_analysis, ticker) # , tokens_used # rating = float(re.findall(r"[0-9]{1,2}" + "S[out of 10|on a scale of 1-10]", buy_or_not_analysis.content)[0].split()[0]) if re.findall(r"[0-9]{1,2}" + " out of 10", buy_or_not_analysis.content) else float("NaN")
-                            rating = rating if rating else get_investment_recommendation_2(buy_or_not_analysis, ticker)
+                            rating = extract_investment_recommendation(buy_or_not_analysis, ticker) # , tokens_used # rating = float(re.findall(r"[0-9]{1,2}" + "S[out of 10|on a scale of 1-10]", buy_or_not_analysis.content)[0].split()[0]) if re.findall(r"[0-9]{1,2}" + " out of 10", buy_or_not_analysis.content) else float("NaN")
+                            rating = rating if rating else extract_investment_recommendation_2(buy_or_not_analysis, ticker)
                             print(ticker + ": " + str(rating))
                             if (ticker not in portfolio['open'].index) and (rating >= UP_MOVE): # care if ticker has just turned to buy # convenient since if 'Zacks Rank' is None conditional expression returns False instead of returning an error and continues, much faster
                                 print(ticker + ": " + " buying")
@@ -1541,8 +1562,8 @@ def run_portfolio_top_n_gainers_ai_analysis(portfolio, start_day=None, end_day=N
                             company_name, location = df_tickers_interval_stop.loc[ticker, ['Name (Alpaca)', 'Location']]
                             # maybe refactor inside of a try statement no need for _fetch_data()
                             buy_or_not_analysis = should_I_buy_the_stock_google_gemini_pro(ticker, company_name, location, add_technical=True) # f"Is it a good time to buy {company_name}?"
-                            rating = get_investment_recommendation(buy_or_not_analysis, ticker) # , tokens_used # rating = float(re.findall(r"[0-9]{1,2}" + "S[out of 10|on a scale of 1-10]", buy_or_not_analysis.content)[0].split()[0]) if re.findall(r"[0-9]{1,2}" + " out of 10", buy_or_not_analysis.content) else float("NaN")
-                            rating = rating if rating else get_investment_recommendation_2(buy_or_not_analysis, ticker)
+                            rating = extract_investment_recommendation(buy_or_not_analysis, ticker) # , tokens_used # rating = float(re.findall(r"[0-9]{1,2}" + "S[out of 10|on a scale of 1-10]", buy_or_not_analysis.content)[0].split()[0]) if re.findall(r"[0-9]{1,2}" + " out of 10", buy_or_not_analysis.content) else float("NaN")
+                            rating = rating if rating else extract_investment_recommendation_2(buy_or_not_analysis, ticker)
                             print(ticker + ": " + str(rating))
                             if (ticker not in portfolio['open'].index) and (rating >= UP_MOVE): # care if ticker has just turned to buy # convenient since if 'Zacks Rank' is None conditional expression returns False instead of returning an error and continues, much faster
                                 print(ticker + ": " + " buying")
@@ -1562,7 +1583,7 @@ def run_portfolio_top_n_gainers_ai_analysis(portfolio, start_day=None, end_day=N
     return portfolio
 
 # FMP  going back to 2014
-def get_senate_timestamps_and_tickers_inflows_and_outflows_by_month_for_stocks(stocks_list):
+def senate_timestamps_and_tickers_inflows_and_outflows_by_month_for_stocks(stocks_list):
     df = pd.DataFrame() # _averaged_summed_and_grouped
     amounts_to_map = {'$15,001 - $50,000':33000, '$1,001 - $15,000':7500, '$50,001 - $100,000':75000, '$100,001 - $250,000':175000, '$1,000,001 - $5,000,000':2500000, '$500,001 - $1,000,000':750000, '$250,001 - $500,000':375000, '$5,000,001 - $25,000,000':15000000}
     for ticker in stocks_list:
@@ -1604,8 +1625,8 @@ def run_portfolio_senate_trading(portfolio, start_day=None, end_day=None, senate
     if 'senate_timestamps_and_tickers_inflows_and_outflows' in params:
         senate_timestamps_and_tickers_inflows_and_outflows = params['senate_timestamps_and_tickers_inflows_and_outflows']
     else:
-        df_tickers_sp500 = params['df_tickers_sp500'] if 'df_tickers_sp500' in params else _fetch_data(get_sp500_ranked_tickers_by_marketbeat, params={}, error_str=" - No s&p 500 tickers data from Market Beat on: " + str(datetime.now()), empty_data = pd.DataFrame()) # assuming s&p500 hasn't changed since start_day
-        senate_timestamps_and_tickers_inflows_and_outflows = _fetch_data(get_senate_timestamps_and_tickers_inflows_and_outflows_by_month_for_stocks, params={'stocks_list': list(df_tickers_sp500.index)}, error_str=" - Issues with senate timestamps and tickers inflows and outflows by month data from FMP on: " + str(datetime.now()), empty_data = pd.DataFrame())
+        df_tickers_sp500 = params['df_tickers_sp500'] if 'df_tickers_sp500' in params else _fetch_data(get_sp500_ranked_tickers_by_marketbeat, params={}, error_str=" - No s&p 500 tickers data from MarketBeat on: " + str(datetime.now()), empty_data = pd.DataFrame()) # assuming s&p500 hasn't changed since start_day
+        senate_timestamps_and_tickers_inflows_and_outflows = _fetch_data(senate_timestamps_and_tickers_inflows_and_outflows_by_month_for_stocks, params={'stocks_list': list(df_tickers_sp500.index)}, error_str=" - Issues with senate timestamps and tickers inflows and outflows by month data from FMP on: " + str(datetime.now()), empty_data = pd.DataFrame())
         if df_tickers_sp500.empty or senate_timestamps_and_tickers_inflows_and_outflows.empty: # df_tickers_sp500.empty - precautionary should never be empty # df_tickers_interval_start.empty or df_tickers_interval_stop.empty or  # df_tickers_interval_stop.empty
             print("Error no df_tickers_sp500 or senate_timestamps_and_tickers_inflows_and_outflows cannot perform algorithm")
             return portfolio
@@ -1686,7 +1707,7 @@ def run_portfolio_sma_mm(portfolio, start_day=None, end_day=None, sma_mm_sell=Tr
         interval_stop_date = interval_stop_date - timedelta(days=1)
     df_tickers_interval_stop, df_tickers_sp500 = get_saved_tickers_data(date=interval_stop_date.strftime('%Y-%m-%d')), pd.DataFrame()
     if UP_DOWN_MOVE == "price-200D-sp500":
-        df_tickers_sp500 = params['df_tickers_sp500'] if 'df_tickers_sp500' in params else _fetch_data(get_sp500_ranked_tickers_by_marketbeat, params={}, error_str=" - No s&p 500 tickers data from Market Beat on: " + str(datetime.now()), empty_data = pd.DataFrame()) # assuming s&p500 hasn't changed since start_day
+        df_tickers_sp500 = params['df_tickers_sp500'] if 'df_tickers_sp500' in params else _fetch_data(get_sp500_ranked_tickers_by_marketbeat, params={}, error_str=" - No s&p 500 tickers data from MarketBeat on: " + str(datetime.now()), empty_data = pd.DataFrame()) # assuming s&p500 hasn't changed since start_day
         if df_tickers_sp500.empty: # df_tickers_sp500.empty - precautionary should never be empty # df_tickers_interval_start.empty or df_tickers_interval_stop.empty or  # df_tickers_interval_stop.empty
             print("Error no df_tickers_sp500 cannot perform algorithm")
             return portfolio

@@ -54,7 +54,7 @@ usa_holidays = usa_cal.holidays(start=datetime.now(eastern).replace(month=1, day
 
 Single ticker detailed data:
 ```python
-ticker='GOOGL'
+ticker = 'GOOGL'
 ticker_data_detailed = stocks._fetch_data(stocks.get_ticker_data_detailed_fmp, params={'ticker': ticker}, error_str=" - No ticker data detailed FMP for ticker: " + ticker + " on: " + str(datetime.now()), empty_data={})
 ```
 
@@ -71,6 +71,48 @@ df_tickers_2025_11_17 = stocks.get_saved_tickers_data(date='2025-11-17')
 # View the 48 saved data points on GOOGL
 df_tickers_2025_11_17.loc['GOOGL']
 ```
+
+## Get todays other (Google Trends & Yahoo Finance & Google Finance & ExchangeRate & MarketBeat & CrunchBase) data
+
+```python
+import pandas as pd
+
+ticker, stop_day ='TSLA', datetime.now()
+
+# 15 days Google Trends of a Ticker
+google_trends = stocks._fetch_data(stocks.get_google_trends_pt, params={'kw_list': [ticker], 'from_date': stop_day - timedelta(days=15), 'to_date': stop_day}, error_str=" - No " + "google trends" \
+ + " data for ticker search term: " + ticker + " from: " + str(stop_day - timedelta(days=15)) + " to: " + str(stop_day), empty_data=pd.DataFrame())
+
+# Yahoo Finance Scraped Data
+ticker_data_detailed = stocks._fetch_data(stocks.get_ticker_data_detailed_yfinance, params={'ticker': ticker}, error_str=" - No ticker data detailed Yahoo Finance for ticker: " + ticker + " on: " + str(datetime.now()), empty_data={})
+
+# Google Finance Scraped Data for Tech companies (NASDAQ exchange, if loop through Alpaca assets ie for asset in  stocks._fetch_data(stocks.alpaca_api.list_assets ...): asset.exchange can be extracted for every ticker = asset.symbol)
+exchange = 'NASDAQ'
+ticker_data_detailed = stocks._fetch_data(stocks.get_ticker_data_detailed_gfinance, params={'ticker': ticker, 'exchange': exchange}, error_str=" - No ticker data detailed gfinance for ticker: " + ticker + " on exchange: " + exchange + " on: " + str(datetime.now()), empty_data={})
+
+# ExchangeRate
+exchange_rates_usd = stocks._fetch_data(stocks.get_exchange_rates_exchangerate, params={'base_currency': 'USD'}, error_str=" - No Exchange Rates (USD) from ExchangeRate-api on: " + str(datetime.now()), empty_data = {})
+
+# MarketBeat
+df_tickers_sp500 = stocks._fetch_data(stocks.get_sp500_ranked_tickers_by_marketbeat, params={}, error_str=" - No s&p 500 tickers data from MarketBeat on: " + str(datetime.now()), empty_data = pd.DataFrame())
+
+# CrunchBase downloading Tech Company data, bot detectors are quite good so currently blocked even with fake_headers and cookies
+from fake_headers import Headers
+import re
+
+todays_date = datetime.now()
+df_tickers_today = stocks.get_saved_tickers_data(date=todays_date.strftime('%Y-%m-%d'))
+
+# Peer Company Tech Company data
+# tech_companies = df_tickers_today[df_tickers_today['Sector'] == 'Technology']
+
+headers, cookies = Headers(os="mac", headers=True).generate(), {'cid': 'CihjF2EJua4XkgAtPH5jAg==', '_pxhd': 'IhifXsIJ7A98ehR9VBprDcS2R0QJLw7ZvwUY8CR9jpoQ3fvPaRezXrWDUfCcqC75orD5OSnwJYS1ZP1A9ieOqQ==:-teWJPV0KWw6Vvnu46qXzIor-OW/6skuVb7jq-NfX4yCB-PpRiHoi31hJLDhl9vQQvj7qfVoeGpVqjlXPiFQqX6rZ/ihiPQ72Z1oh0nv1SE=', '__cflb': '02DiuJLCopmWEhtqNz5agBnHnWotHyxG4jgU9FLJcAXuE'}
+company_name_re = re.compile(r'\b(?:{0}?\.)\b'.format('|'.join(['inc', 'incorporated', 'co', 'corp', 'corporation', 'ltd', 'limited', 'class a', 'american depositary shares', 'common stock', 'ordinary shares'])))
+permalink = "-".join(company_name_re.split(df_tickers_today.loc[ticker, 'Name (Alpaca)'].lower())[0].replace(',','').strip().split(" ")) # re.sub(",?(\s)", "",
+[crunchbase_data, resp_status_code] = stocks._fetch_data(stocks.get_crunchbase_data_for_ticker, params={'ticker': ticker, 'permalink_original': permalink, 'headers': headers, 'cookies': cookies}, error_str=" - No CrunchBase data for ticker: " + ticker + " with permalink_original: " + permalink + " on: " + str(datetime.now()), empty_data={})
+```
+
+## Algorithms
 
 ## Send message to your Phone via Twilio
 
