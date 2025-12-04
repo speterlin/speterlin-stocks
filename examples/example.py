@@ -1,4 +1,4 @@
-import stocks_speterlin.module1 as stocks
+import speterlin_stocks.module1 as stocks
 
 # IMPORT other script packages like in github.com/speterlin/quant-trading README.md#Python script for Stocks
 
