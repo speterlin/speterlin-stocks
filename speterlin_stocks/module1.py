@@ -369,7 +369,7 @@ def get_ticker_data_detailed_yfinance(ticker, options={'engaged': False, 'type':
                 continue
             data[current_label] = current_value
     # if options['engaged']: # need to complete / refactor
-        # site_url = 'https://finance.yahoo.com/quote/' + ticker + '/' + (options['engaged'])
+        # site_url = 'https://finance.yahoo.com/quote/' + ticker + '/' + (options['type'])
     if additional_page['engaged']: # need to refactor
         site_url = 'https://finance.yahoo.com/quote/' + ticker + '/' + (additional_page['type']) + '/'
         resp = requests.get(site_url, headers=headers)
@@ -1314,7 +1314,7 @@ def run_portfolio_random_sp500(portfolio, start_day=None, end_day=None, random_s
     end_day = end_day if end_day else datetime.now().replace(hour=13, minute=0, second=0, microsecond=0) # maybe refactor, markets are from 9:30 - 16:00 EST / 6:30 - 13:00 EST
     start_day = start_day if start_day else end_day - timedelta(days=DAYS)
     stop_day = start_day + timedelta(days=DAYS)
-    df_tickers_sp500 = params['df_tickers_sp500'] if 'df_tickers_sp500' in params else _fetch_data(get_sp500_ranked_tickers_by_marketbeat, params={}, error_str=" - No s&p 500 tickers data from MarketBeat on: " + str(datetime.now()), empty_data = pd.DataFrame()) # assuming s&p500 hasn't changed since start_day
+    df_tickers_sp500 = params['df_tickers_sp500'] if 'df_tickers_sp500' in params else _fetch_data(get_sp500_ranked_tickers_by_marketbeat, params={}, error_str=" - No S&P 500 tickers data from MarketBeat on: " + str(datetime.now()), empty_data = pd.DataFrame()) # assuming S&P 500 hasn't changed since start_day
     if df_tickers_sp500.empty: # df_tickers_sp500.empty - precautionary should never be empty # df_tickers_interval_start.empty or df_tickers_interval_stop.empty or  # df_tickers_interval_stop.empty
         print("Error no df_tickers_sp500 cannot perform algorithm")
         return portfolio
@@ -1449,7 +1449,7 @@ def run_portfolio_ai_recommendations_in_sector(portfolio, start_day=None, end_da
     if (not type(portfolio['constants']['up_down_move']) is list) or len(portfolio['constants']['up_down_move']) != 2:
         print("Error up/down move constant not a list or a list not == 2")
         return portfolio
-    UP_MOVE, DOWN_MOVE = portfolio['constants']['up_down_move'] # maybe refactor and add similar to up_down_move with difference between start day's zacks rank and stop day's zacks rank,
+    UP_MOVE, DOWN_MOVE, SECTOR = portfolio['constants']['up_down_move'] # maybe refactor and add similar to up_down_move with difference between start day's zacks rank and stop day's zacks rank,
     DAYS = portfolio['constants']['days']
     # TAKE_PROFIT_PERCENTAGE = 1.0
     # PRICE_UNCERTAINTY_PERCENTAGE = 0.05 # to reflect that can't always buy/sell at Yahoo Finance price and that stop loss and trailing stop loss orders can't always be fulfilled at the exact percentage
@@ -1484,8 +1484,8 @@ def run_portfolio_ai_recommendations_in_sector(portfolio, start_day=None, end_da
                 if not df_tickers_interval_stop.empty:
                     # refactor and add logic for dealing with if zacks rank is in  df_tickers_interval_start/stop
                     tickers_to_buy, tickers_to_sell = [], [] # Counter(), Counter()
-                    sector = 'Financial Services'
-                    for ticker in df_tickers_interval_stop[df_tickers_interval_stop['Sector'] == sector][:limit_companies].index: # My OpenAI plan has a quota ~484 hits / day
+                    # sector = 'Financial Services'
+                    for ticker in df_tickers_interval_stop[df_tickers_interval_stop['Sector'] == SECTOR][:limit_companies].index: # My OpenAI plan has a quota ~484 hits / day
                         ticker_count += 1
                         if add_pauses_to_avoid_unsolved_error['engaged'] and (ticker_count % add_pauses_to_avoid_unsolved_error['tickers'] == 0):
                             print("Sleeping " + str(add_pauses_to_avoid_unsolved_error['time']/60) + "min every " + str(add_pauses_to_avoid_unsolved_error['tickers']) + " tickers on date: " + str(stop_day.date()))
@@ -1625,7 +1625,7 @@ def run_portfolio_senate_trading(portfolio, start_day=None, end_day=None, senate
     if 'senate_timestamps_and_tickers_inflows_and_outflows' in params:
         senate_timestamps_and_tickers_inflows_and_outflows = params['senate_timestamps_and_tickers_inflows_and_outflows']
     else:
-        df_tickers_sp500 = params['df_tickers_sp500'] if 'df_tickers_sp500' in params else _fetch_data(get_sp500_ranked_tickers_by_marketbeat, params={}, error_str=" - No s&p 500 tickers data from MarketBeat on: " + str(datetime.now()), empty_data = pd.DataFrame()) # assuming s&p500 hasn't changed since start_day
+        df_tickers_sp500 = params['df_tickers_sp500'] if 'df_tickers_sp500' in params else _fetch_data(get_sp500_ranked_tickers_by_marketbeat, params={}, error_str=" - No S&P 500 tickers data from MarketBeat on: " + str(datetime.now()), empty_data = pd.DataFrame()) # assuming S&P 500 hasn't changed since start_day
         senate_timestamps_and_tickers_inflows_and_outflows = _fetch_data(senate_timestamps_and_tickers_inflows_and_outflows_by_month_for_stocks, params={'stocks_list': list(df_tickers_sp500.index)}, error_str=" - Issues with senate timestamps and tickers inflows and outflows by month data from FMP on: " + str(datetime.now()), empty_data = pd.DataFrame())
         if df_tickers_sp500.empty or senate_timestamps_and_tickers_inflows_and_outflows.empty: # df_tickers_sp500.empty - precautionary should never be empty # df_tickers_interval_start.empty or df_tickers_interval_stop.empty or  # df_tickers_interval_stop.empty
             print("Error no df_tickers_sp500 or senate_timestamps_and_tickers_inflows_and_outflows cannot perform algorithm")
@@ -1707,7 +1707,7 @@ def run_portfolio_sma_mm(portfolio, start_day=None, end_day=None, sma_mm_sell=Tr
         interval_stop_date = interval_stop_date - timedelta(days=1)
     df_tickers_interval_stop, df_tickers_sp500 = get_saved_tickers_data(date=interval_stop_date.strftime('%Y-%m-%d')), pd.DataFrame()
     if UP_DOWN_MOVE == "price-200D-sp500":
-        df_tickers_sp500 = params['df_tickers_sp500'] if 'df_tickers_sp500' in params else _fetch_data(get_sp500_ranked_tickers_by_marketbeat, params={}, error_str=" - No s&p 500 tickers data from MarketBeat on: " + str(datetime.now()), empty_data = pd.DataFrame()) # assuming s&p500 hasn't changed since start_day
+        df_tickers_sp500 = params['df_tickers_sp500'] if 'df_tickers_sp500' in params else _fetch_data(get_sp500_ranked_tickers_by_marketbeat, params={}, error_str=" - No S&P 500 tickers data from MarketBeat on: " + str(datetime.now()), empty_data = pd.DataFrame()) # assuming S&P 500 hasn't changed since start_day
         if df_tickers_sp500.empty: # df_tickers_sp500.empty - precautionary should never be empty # df_tickers_interval_start.empty or df_tickers_interval_stop.empty or  # df_tickers_interval_stop.empty
             print("Error no df_tickers_sp500 cannot perform algorithm")
             return portfolio
