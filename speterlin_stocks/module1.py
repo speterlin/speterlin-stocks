@@ -7,7 +7,6 @@
 # twilio_phone_from = None
 # portfolio_account = None # maybe add portfolio_name later for more consistent logic
 
-
 # unused since not 'from .module1 import *' in __init__.py
 __all__ = [
     "_fetch_data",
@@ -105,7 +104,7 @@ def get_zacks_data(ticker=None):
     # zacks rank, can also do motley fool, found from github.com/janlukasschroeder/zacks-api
     # proxies = {'http':'http://localhost:port','https':'http://localhost:port'}
     headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10 7 4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'} #
-    resp = requests.get("https://quote-feed.zacks.com/?t=" + ticker, headers=headers, verify=False) # proxies=proxies, #) # , verify=False # can add installing openssl: https://stackoverflow.com/questions/51768496/why-do-https-requests-produce-ssl-certificate-verify-failed-error
+    resp = requests.get("https://quote-feed.zacks.com/?t=" + ticker, headers=headers, verify=False) # proxies=proxies, #) # , verify=False # can add installing openssl: https://stackoverflow.com/questions/51768496/why-do-https-requests-produce-ssl-certificate-verify-failed-error, https://www.google.com/search?q=browser+request+vs.+python+requests.get&oq=browser+request+vs.+python+requests.get&aqs=chrome..69i57.8276j0j7&sourceid=chrome&ie=UTF-8
     data = resp.json()
     return data
 
@@ -340,9 +339,10 @@ def get_ticker_data_detailed_yfinance(ticker, options={'engaged': False, 'type':
     #     if span.string: # and (len(script.string) > max_script['length']): # can't use .text after bs.__version__ > 4.8.0
     #         # max_script['length'], max_script['idx'] = len(script.string), idx # print(str(idx) +  ": " + td.string) # print(str(idx) +  ": " + td.string)", len: " + str(len(script.string)) + ", first 100 characters: " + script.string[:100] + ", last 100 characters: " + script.string[-100:])
     #         if span.string not in ['Valuation Measures', 'Financial Highlights', ...]:
+    last = float(soup.find('span', {'data-testid': 'qsp-price'}).text.strip().replace(',',"")) # after-hours value is data-testid='qsp-post-price' # .replace('$',"")
     div_quote_statistics = soup.find('div', {'data-testid': 'quote-statistics'})
     lis = div_quote_statistics.find_all('li')
-    data, times_table, current_label = {}, {'T': 1e12, 'B': 1e9, 'M': 1e6, 'K': 1e3}, None # 'Last': last
+    data, times_table, current_label = {'Last': last}, {'T': 1e12, 'B': 1e9, 'M': 1e6, 'K': 1e3}, None
     for idx,li in enumerate(lis):
         if li.text: # and (len(script.string) > max_script['length']): # can't use .text after bs.__version__ > 4.8.0
             # max_script['length'], max_script['idx'] = len(script.string), idx # print(str(idx) +  ": " + li.string) # print(str(idx) +  ": " + li.string)", len: " + str(len(script.string)) + ", first 100 characters: " + script.string[:100] + ", last 100 characters: " + script.string[-100:])
@@ -677,7 +677,7 @@ from unidecode import unidecode
 from fake_headers import Headers
 
 def get_crunchbase_search_permalinks(permalink, **params):
-    # time.sleep(5) # since if return a long list (up to 25) will iterate over a long list will get json.decoder.JSONDecodeError: Expecting value: line 6 column 1 (char 5) error
+    # time.sleep(5) # since if return a long list (up to 25) will iterate over a long list will get json.decoder.JSONDecodeError: Expecting value: line 6 column 1 (char 5) error -> https://stackoverflow.com/questions/34579327/jsondecodeerror-expecting-value-line-1-column-1?rq=1
     permalinks = [] # maybe refactor and change this (declaring empty function return / half of what function returns at beginning of function) in this function and below crunchbase functions
     site_url = "https://www.crunchbase.com/v4/data/autocompletes?query=" + "%20".join(permalink.split("-")) + "&collection_ids=organizations&limit=25&source=topSearch" # maybe refactor limit=25, permalink.split("-"/" ")
     headers, cookies = params['headers'] if ('headers' in params and params['headers']) else Headers(os="mac", headers=True).generate(), params['cookies'] if ('cookies' in params and params['cookies']) else {'cid': 'CihjF2EJua4XkgAtPH5jAg==', '_pxhd': 'IhifXsIJ7A98ehR9VBprDcS2R0QJLw7ZvwUY8CR9jpoQ3fvPaRezXrWDUfCcqC75orD5OSnwJYS1ZP1A9ieOqQ==:-teWJPV0KWw6Vvnu46qXzIor-OW/6skuVb7jq-NfX4yCB-PpRiHoi31hJLDhl9vQQvj7qfVoeGpVqjlXPiFQqX6rZ/ihiPQ72Z1oh0nv1SE=', '__cflb': '02DiuJLCopmWEhtqNz5agBnHnWotHyxG4jgU9FLJcAXuE'} # maybe refactor here and below and add changing of exit IP address of request as described: https://www.scrapehero.com/how-to-fake-and-rotate-user-agents-using-python-3/
@@ -1000,7 +1000,6 @@ def get_sp500_ranked_tickers_by_marketbeat():
         price_change = price_change / 100
         df_tickers.loc[ticker, ['Company Name', 'S&P 500 Rank', 'Price', 'Price Change']] = [company_name, sp_rank, price, price_change]
     return df_tickers
-
 
 def run_portfolio(portfolio, **params): # call portfolio = run_portfolio(portfolio, **params) for all functions below, if pass paper_trading=True in run_portfolio() params should pick it up and treat as a normal parameter in run_portfolio_rr etc # start_day=None, end_day=None, algo_sell=True, paper_trading=True, back_testing=False, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 240, 'days': 15}
     if portfolio['constants']['type'] == 'rr':
