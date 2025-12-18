@@ -19,36 +19,37 @@ __all__ = [
     "get_ticker_stock_news_articles_fmp",
     "get_daily_stock_gainers_fmp",
     "get_tickers_with_stock_splits_in_85_days_period_fmp",
-    "tickers_with_stock_splits_in_period_fmp",
-    # "get_etf_constituents_fmp"
+    "get_tickers_with_stock_splits_in_period_fmp",
+    "get_tickers_with_stock_splits_fmp",
+    # "get_etf_constituents_fmp",
     "get_senate_trading_symbol_fmp",
-    # "get_ticker_data_yf"
-    # "get_exchange_rates_exchangerate"
-    # "get_ticker_data_detailed_gfinance"
-    # "get_ticker_data_detailed_yfinance"
+    # "get_ticker_data_yf",
+    # "get_ticker_data_detailed_yfinance",
+    # "get_tickers_with_stock_splits_in_day_yfinance",
+    # "get_tickers_with_stock_splits_in_period_yfinance",
+    # "get_exchange_rates_exchangerate",
+    # "get_ticker_data_detailed_gfinance",
     # "openai_functions", # array of functions
+    # "should_I_buy_the_stock_openai",
+    "should_I_buy_the_stock_google_gemini_pro",
     "extract_investment_recommendation",
     "extract_investment_recommendation_2",
-    # "should_I_buy_the_stock_openai"
-    "should_I_buy_the_stock_google_gemini_pro",
     "get_google_trends_pt", # replaces "get_cryptory",
     "get_saved_tickers_data",
-    # "save_usa_tv_tickers_zacks_data"
+    # "save_usa_tv_tickers_zacks_data",
     "save_tickers_yf_and_fmp_data",
     "save_tickers_daily_gainers_fmp",
     "save_usa_alpaca_tickers_fmp_data",
     # "get_crunchbase_search_permalinks",
-    # "get_crunchbase_permalink_site_check_ticker"
-    # "get_crunchbase_data_for_ticker"
+    # "get_crunchbase_permalink_site_check_ticker",
+    # "get_crunchbase_data_for_ticker",
     "alpaca_trade_ticker",
     "get_alpaca_assets",
     "fmp_check_24h_vol",
     "update_portfolio_postions_back_testing",
     "get_tickers_to_avoid_in_alpaca",
-    "tickers_to_avoid",
+    "get_tickers_to_avoid",
     "update_portfolio_buy_and_sell_tickers",
-    # "get_tickers_with_stock_splits_in_day_yfinance",
-    # "tickers_with_stock_splits_in_period_yfinance",
     "get_sp500_ranked_tickers_by_marketbeat",
     "run_portfolio",
     "run_portfolio_zr",
@@ -225,7 +226,7 @@ def get_tickers_with_stock_splits_in_85_days_period_fmp(start_datetime=None, end
         data = json.loads(r.text) # [0] - assuming r.text is return as a list
     return data[::-1] # data.reverse() # ensure list is in ascending order
 
-def tickers_with_stock_splits_in_period_fmp(start_day): # no end day specified since end day will always be current day since if end day is not current day and ticker split after the end_day then the daily yahoo finance prices will be updated and reflect the stock split but the hourly yahoo finance prices will reflect the stock prices at that day
+def get_tickers_with_stock_splits_in_period_fmp(start_day): # no end day specified since end day will always be current day since if end day is not current day and ticker split after the end_day then the daily yahoo finance prices will be updated and reflect the stock split but the hourly yahoo finance prices will reflect the stock prices at that day
     tickers_for_period = []
     stop_day, end_day = start_day, datetime.now() # don't allow stop_day to be less than start_day since if stock split before start_day then price change should already be accounted for
     while stop_day.date() <= end_day.date():
@@ -239,6 +240,24 @@ def tickers_with_stock_splits_in_period_fmp(start_day): # no end day specified s
     df = pd.DataFrame(tickers_for_period)
     df = df.dropna(how="any") # drops missing values
     return df
+
+def get_tickers_with_stock_splits_fmp(start_day): # check tickers with tickers_with_stock_splits[tickers_with_stock_splits['symbol']==ticker]
+    tickers_with_stock_splits = get_tickers_with_stock_splits_in_period_fmp(start_day=start_day)
+    skip_idxs = []
+    for idx in tickers_with_stock_splits.index:
+        if idx not in skip_idxs:
+            symbol, date = tickers_with_stock_splits.loc[idx, ['symbol', 'date']]
+            matching_rows = tickers_with_stock_splits[(tickers_with_stock_splits['symbol'] == symbol) & (tickers_with_stock_splits['date'] == date)]
+            if len(matching_rows) > 1:
+                print(symbol + ", " + str(date) + ": Deleting repeated row " + str(matching_rows))
+                repeated_idx = matching_rows.index[-1]
+                tickers_with_stock_splits = tickers_with_stock_splits.drop(repeated_idx)
+                skip_idxs.append(repeated_idx)
+    for ticker, dates in {'MMAT': {'date-incorrect': '2024-01-29', 'date-correct': '2024-01-26'}, 'KAVL': {'date-incorrect': '2024-01-25', 'date-correct': '2024-01-24'}}.items():
+        idx = tickers_with_stock_splits[(tickers_with_stock_splits['symbol']==ticker) & (tickers_with_stock_splits['date']==dates['date-incorrect'])].index.tolist()
+        print(ticker + ", " + str(idx) + ": Correcting incorrect date")
+        tickers_with_stock_splits.loc[idx, ['date', 'label']] = [dates['date-correct'], datetime.strptime(dates['date-correct'], '%Y-%m-%d').strftime('%B %d, %y')]
+    return tickers_with_stock_splits
 
 # note some tickers are returned different than normal ie 'BRK.B' is returned 'BRK-B'
 def get_etf_constituents_fmp(etf):
@@ -278,57 +297,6 @@ def get_ticker_data_yf(ticker, start_datetime=None, end_datetime=None, interval=
 
 import bs4 as bs
 import re
-
-def get_exchange_rates_exchangerate(base_currency="USD"):
-    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10 7 4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'} #
-    site_url = 'https://api.exchangerate-api.com/v4/latest/' + base_currency
-    resp = requests.get(site_url, headers=headers) #
-    # if resp.status_code == 200:
-    resp_in_json = resp.json()
-    rates_dict = resp_in_json['rates']
-    # else:
-    #     return response.status_code
-    return rates_dict
-
-def get_ticker_data_detailed_gfinance(ticker, exchange):
-    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10 7 4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'} # {'User-Agent': 'Mozilla/4.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'} # maybe refactor here and below, might change header to something else but doesn't matter just tricking the server (fighting bots / crawlers) into thinking it's a browser making the request, header is from https://stackoverflow.com/questions/68259148/getting-404-error-for-certain-stocks-and-pages-on-yahoo-finance-python
-    site_url = 'https://www.google.com/finance/quote/' + ticker + ':' + exchange # 'https://www.investing.com/equities/google-inc' # + ticker + '/' + (options['type'] if options['engaged'] else '') # https://finance.yahoo.com/quote/TSLA/key-statistics?p=TSLA&.tsrc=fin-srch
-    resp = requests.get(site_url, headers=headers) # , auth=(username, password)) # maybe add timeout=50 to avoid unsolved_error (see requests documentation)
-    soup = bs.BeautifulSoup(resp.text, 'html.parser')
-    last = float(soup.find('div', {'class': 'AHmHk'}).text.strip().replace('$',"").replace(',',""))
-    divs = soup.findAll('div', {'class': 'gyFHrc'}) # divs = soup.find('div', {'class': 'eYanAe'}).findAll('div')
-    data, times_table = {'Last': last}, {'T': 1e12, 'B': 1e9, 'M': 1e6, 'K': 1e3}
-    exchange_rates_usd = _fetch_data(get_exchange_rates_exchangerate, params={'base_currency': 'USD'}, error_str=" - No Exchange Rates (USD) from ExchangeRate-api on: " + str(datetime.now()), empty_data = {})
-    for div in divs:
-        # print(div.text)
-        current_label = div.find('div', {'class': 'mfs7Fc'}).text.strip()
-        if current_label in ['Market cap', 'Avg Volume']:
-            current_value_text = div.find('div', {'class': 'P6K39c'}).text.strip().split(" ")[0] # maybe refactor and add .replace('$',"").replace(',',"").replace(' ',"")
-            try:
-                current_value = float(current_value_text[:-1]) * times_table[current_value_text[-1]]
-            except:
-                current_value = float(current_value_text)
-            if current_label in ['Market cap']:
-                currency = div.find('div', {'class': 'P6K39c'}).text.strip().split(" ")[1] #
-                if currency != 'USD':
-                    current_value = current_value / float(exchange_rates_usd[currency]) if currency in exchange_rates_usd else float("NaN") # float(exchange_rates_usd[currency]) precautionary exchange_rates_usd[currency] is int
-        elif current_label in ['CEO', 'Headquarters']:
-            current_value = ", ".join(div.find('div', {'class': 'P6K39c'}).get_text(strip=True, separator='\n').split("\n"))
-            # current_value = div.find('div', {'class': 'P6K39c'}).get_text(strip=True, separator='br').splitlines()
-        elif current_label in ['Founded']:
-            try:
-                current_value = datetime.strptime(div.find('div', {'class': 'P6K39c'}).text.strip(), '%b %d, %Y')
-            except:
-                try:
-                    current_value = datetime.strptime(div.find('div', {'class': 'P6K39c'}).text.strip(), '%Y')
-                except:
-                    current_value = datetime.strptime(div.find('div', {'class': 'P6K39c'}).text.strip(), '%b %Y')
-        else:
-            current_value = div.find('div', {'class': 'P6K39c'}).text.strip().replace('$',"").replace(',',"").replace(' ',"").replace('%',"")
-            current_value = float("NaN") if current_value in ["∞", "-", "--", "No Data", "No"] else float(current_value)/100.0 if current_label in ['Dividend yield'] else float(current_value) if current_label in ['Previous close', 'P/E ratio', 'Employees'] else current_value #
-        data[current_label] = current_value
-    data['EPS (TTM)'] = (1 / data['P/E ratio']) * last if 'P/E ratio' in data else float("NaN") # P/E is using TTM assuming it's basic earnings
-    return data
 
 def get_ticker_data_detailed_yfinance(ticker, options={'engaged': False, 'type': 'key-statistics'}, additional_page={'engaged': False, 'type': 'profile'}): # maybe refactor to incorporate multiple options # 'financials' # financial options doesn't include 'summaryProfile', 'defaultKeyStatistics', 'financialData'
     headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10 7 4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'} # {'User-Agent': 'Mozilla/4.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'} # maybe refactor here and below, might change header to something else but doesn't matter just tricking the server (fighting bots / crawlers) into thinking it's a browser making the request, header is from https://stackoverflow.com/questions/68259148/getting-404-error-for-certain-stocks-and-pages-on-yahoo-finance-python
@@ -392,6 +360,101 @@ def get_ticker_data_detailed_yfinance(ticker, options={'engaged': False, 'type':
                 data[current_label] = current_value
     return data
 
+def get_tickers_with_stock_splits_in_day_yfinance(date, tickers_for_period): # date is a string in format '%Y-%m-%d' (example: '2021-03-12')
+    tickers = {} # , random_int , randint(0, 100)
+    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10 7 4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'} # {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'}
+    # if random_int % 20 == 0:
+    #     print("Sleeping 30 seconds for random int " + str(random_int) + " % 20 == 0 on: " + str(datetime.now()))
+    #     time.sleep(30)
+    site_url = 'https://finance.yahoo.com/calendar/splits/?day=' + date # '2020-11-09'
+    resp = requests.get(site_url, headers=headers) #  # if random_int % 2 != 0 else requests.get(site_url, headers=headers[1])
+    soup = bs.BeautifulSoup(resp.text, 'html.parser')
+    table = soup.find('table', {'class': 'W(100%)'})
+    for row in table.findAll('tr')[1:]:
+        tds = row.findAll('td')
+        ticker = tds[0].text.strip()
+        split_ratio_text = tds[4].text.strip() if (tds[4].text.strip() and tds[4].text.strip() != '-') else "1.00 - 1.00"
+        try:
+            split_ratio = float(split_ratio_text.split("-")[0]) / float(split_ratio_text.split("-")[1]) # yahoo finance must have switched ratio format in 2023, used to be: float(split_ratio_text.split("-")[1]) / float(split_ratio_text.split("-")[0])
+        except Exception as e:
+            print(str(e) + " - Issue with split_ratio_text on date: " + date + ", skipping " + ticker)
+            continue
+        ex_date = datetime.strptime(date, '%Y-%m-%d') # datetime.strptime(tds[2].text.strip(), '%b %d, %Y')
+        if ticker in tickers_for_period:
+            print(ticker + ": multiple splits in time period " + str(tickers_for_period[ticker]) + " with split_ratio: " + str(split_ratio) + " on date: " + date)
+            tickers[ticker] = tickers_for_period[ticker] + [{'split_ratio': split_ratio, 'ex_date': ex_date}] # split_ratio = tickers_for_period[ticker]['split_ratio'] * split_ratio
+        else:
+            tickers[ticker] = [{'split_ratio': split_ratio, 'ex_date': ex_date}]
+    return tickers
+
+def get_tickers_with_stock_splits_in_period_yfinance(start_day, **params): # no end day specified since end day will always be current day since if end day is not current day and ticker split after the end_day then the daily yahoo finance prices will be updated and reflect the stock split but the hourly yahoo finance prices will reflect the stock prices at that day
+    tickers_for_period = {}
+    stop_day, end_day = start_day, datetime.now() # don't allow stop_day to be less than start_day since if stock split before start_day then price change should already be accounted for
+    usa_holidays = params['usa_holidays'] if 'usa_holidays' in params else {}
+    count = 0
+    while stop_day.date() <= end_day.date():
+        count += 1
+        if count % 40 == 0: # maybe refactor take out since unlikely this will hit: 2000/365: 5.47 years
+            print("Sleeping 7min every 40 requests on: " + str(datetime.now()))
+            time.sleep(7*60)
+        tickers_for_day = _fetch_data(get_tickers_with_stock_splits_in_day_yfinance, params={'date': stop_day.strftime('%Y-%m-%d'), 'tickers_for_period': tickers_for_period}, error_str=" - No (or issue with) tickers with stock splits on date: " + str(stop_day) + ", on: " + str(datetime.now()), empty_data={})
+        tickers_for_period = {**tickers_for_period, **tickers_for_day}
+        stop_day = stop_day + timedelta(days=1)
+        while stop_day.weekday() > 4 or (stop_day.replace(hour=0, minute=0, second=0, microsecond=0) in usa_holidays): # interval_start_date/stop_day in usa_holidays # stop_day = (stop_day + timedelta(days=1)) if (stop_day.weekday() < 4) else (stop_day + timedelta(days=7-stop_day.weekday())) # to avoid weekends, refactor to avoid holidays (2020-05-25)
+            stop_day = stop_day + timedelta(days=1)
+    return tickers_for_period
+
+def get_exchange_rates_exchangerate(base_currency="USD"):
+    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10 7 4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'} #
+    site_url = 'https://api.exchangerate-api.com/v4/latest/' + base_currency
+    resp = requests.get(site_url, headers=headers) #
+    # if resp.status_code == 200:
+    resp_in_json = resp.json()
+    rates_dict = resp_in_json['rates']
+    # else:
+    #     return response.status_code
+    return rates_dict
+
+def get_ticker_data_detailed_gfinance(ticker, exchange):
+    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10 7 4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'} # {'User-Agent': 'Mozilla/4.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'} # maybe refactor here and below, might change header to something else but doesn't matter just tricking the server (fighting bots / crawlers) into thinking it's a browser making the request, header is from https://stackoverflow.com/questions/68259148/getting-404-error-for-certain-stocks-and-pages-on-yahoo-finance-python
+    site_url = 'https://www.google.com/finance/quote/' + ticker + ':' + exchange # 'https://www.investing.com/equities/google-inc' # + ticker + '/' + (options['type'] if options['engaged'] else '') # https://finance.yahoo.com/quote/TSLA/key-statistics?p=TSLA&.tsrc=fin-srch
+    resp = requests.get(site_url, headers=headers) # , auth=(username, password)) # maybe add timeout=50 to avoid unsolved_error (see requests documentation)
+    soup = bs.BeautifulSoup(resp.text, 'html.parser')
+    last = float(soup.find('div', {'class': 'AHmHk'}).text.strip().replace('$',"").replace(',',""))
+    divs = soup.findAll('div', {'class': 'gyFHrc'}) # divs = soup.find('div', {'class': 'eYanAe'}).findAll('div')
+    data, times_table = {'Last': last}, {'T': 1e12, 'B': 1e9, 'M': 1e6, 'K': 1e3}
+    exchange_rates_usd = _fetch_data(get_exchange_rates_exchangerate, params={'base_currency': 'USD'}, error_str=" - No Exchange Rates (USD) from ExchangeRate-api on: " + str(datetime.now()), empty_data = {})
+    for div in divs:
+        # print(div.text)
+        current_label = div.find('div', {'class': 'mfs7Fc'}).text.strip()
+        if current_label in ['Market cap', 'Avg Volume']:
+            current_value_text = div.find('div', {'class': 'P6K39c'}).text.strip().split(" ")[0] # maybe refactor and add .replace('$',"").replace(',',"").replace(' ',"")
+            try:
+                current_value = float(current_value_text[:-1]) * times_table[current_value_text[-1]]
+            except:
+                current_value = float(current_value_text)
+            if current_label in ['Market cap']:
+                currency = div.find('div', {'class': 'P6K39c'}).text.strip().split(" ")[1] #
+                if currency != 'USD':
+                    current_value = current_value / float(exchange_rates_usd[currency]) if currency in exchange_rates_usd else float("NaN") # float(exchange_rates_usd[currency]) precautionary exchange_rates_usd[currency] is int
+        elif current_label in ['CEO', 'Headquarters']:
+            current_value = ", ".join(div.find('div', {'class': 'P6K39c'}).get_text(strip=True, separator='\n').split("\n"))
+            # current_value = div.find('div', {'class': 'P6K39c'}).get_text(strip=True, separator='br').splitlines()
+        elif current_label in ['Founded']:
+            try:
+                current_value = datetime.strptime(div.find('div', {'class': 'P6K39c'}).text.strip(), '%b %d, %Y')
+            except:
+                try:
+                    current_value = datetime.strptime(div.find('div', {'class': 'P6K39c'}).text.strip(), '%Y')
+                except:
+                    current_value = datetime.strptime(div.find('div', {'class': 'P6K39c'}).text.strip(), '%b %Y')
+        else:
+            current_value = div.find('div', {'class': 'P6K39c'}).text.strip().replace('$',"").replace(',',"").replace(' ',"").replace('%',"")
+            current_value = float("NaN") if current_value in ["∞", "-", "--", "No Data", "No"] else float(current_value)/100.0 if current_label in ['Dividend yield'] else float(current_value) if current_label in ['Previous close', 'P/E ratio', 'Employees'] else current_value #
+        data[current_label] = current_value
+    data['EPS (TTM)'] = (1 / data['P/E ratio']) * last if 'P/E ratio' in data else float("NaN") # P/E is using TTM assuming it's basic earnings
+    return data
+
 openai_functions=[
     {
         "name": "get_company_stock_ticker",
@@ -444,31 +507,6 @@ openai_functions=[
         },
     }
 ]
-
-def extract_investment_recommendation(analysis, ticker):
-    start_time = time.time()
-    try:
-        rating = float(re.findall(r"[2-9]", re.split("[C|c]onclusion|[R|r]ecommend[ation]{0,1}|[O|o]verall", analysis.text)[-1])[0]) # maybe add ^ed for recommend |[R|r]at[e|ed|ing] # excluding 0,1,10 outliers (extremely low or high recommendation) # maybe refactor add rating|recommendation
-    except Exception as e:
-        print(str(e) + " - No (or issue with extracting) investment recommendation for: " + ticker + " on: " + str(datetime.now()) + ", Execution time: " + str(time.time() - start_time))
-        rating = 0
-    print("Execution time: " + str(time.time() - start_time))
-    # rating = float(re.findall(r"[0-9]{1,2}" + " out of 10", analysis.text)[0].split()[0]) if re.findall(r"[0-9]{1,2}" + " out of 10", analysis.text) else float("NaN")
-    # rating = google_gemini_pro_model.generate_content(f"Given the Google Gemini Pro analysis, what is the numeric investment recommendation on a scale of 1-10 of the company stock ticker ?: {analysis.text}?")
-    return rating
-
-def extract_investment_recommendation_2(analysis, ticker):
-    start_time = time.time()
-    try:
-        rating = float(re.findall(r"[2-9]", re.split(r"\srate\s|\srated\s|\srating\s", analysis.text)[-1])[0]) # \s[R|r]at[e|ed|ing]\s # [R|r]at[e|ed|ing] | # excluding 0,1,10 outliers (extremely low or high recommendation) # maybe refactor add rating|recommendation
-    except Exception as e:
-        print(str(e) + " - No (or issue with extracting) investment recommendation for: " + ticker + " on: " + str(datetime.now()) + ", Execution time: " + str(time.time() - start_time))
-        # rating = float(re.findall(r"[2-9]", re.split("[R|r]at[e|ed|ing]", analysis.text)[-1])[0])
-        rating = 0
-    print("Execution time: " + str(time.time() - start_time))
-    # rating = float(re.findall(r"[0-9]{1,2}" + " out of 10", analysis.text)[0].split()[0]) if re.findall(r"[0-9]{1,2}" + " out of 10", analysis.text) else float("NaN")
-    # rating = google_gemini_pro_model.generate_content(f"Given the Google Gemini Pro analysis, what is the numeric investment recommendation on a scale of 1-10 of the company stock ticker ?: {analysis.text}?")
-    return rating
 
 def should_I_buy_the_stock_openai (analysis): # extract_investment_recommendation_openai # , ai="google-gemini-pro"
     response = openai_client.chat.completions.create( # openai.ChatCompletion.create(
@@ -523,6 +561,31 @@ def should_I_buy_the_stock_google_gemini_pro(ticker, company_name, location=None
     #     analysis = None
     print("Execution time: " + str(time.time() - start_time))
     return analysis
+
+def extract_investment_recommendation(analysis, ticker):
+    start_time = time.time()
+    try:
+        rating = float(re.findall(r"[2-9]", re.split("[C|c]onclusion|[R|r]ecommend[ation]{0,1}|[O|o]verall", analysis.text)[-1])[0]) # maybe add ^ed for recommend |[R|r]at[e|ed|ing] # excluding 0,1,10 outliers (extremely low or high recommendation) # maybe refactor add rating|recommendation
+    except Exception as e:
+        print(str(e) + " - No (or issue with extracting) investment recommendation for: " + ticker + " on: " + str(datetime.now()) + ", Execution time: " + str(time.time() - start_time))
+        rating = 0
+    print("Execution time: " + str(time.time() - start_time))
+    # rating = float(re.findall(r"[0-9]{1,2}" + " out of 10", analysis.text)[0].split()[0]) if re.findall(r"[0-9]{1,2}" + " out of 10", analysis.text) else float("NaN")
+    # rating = google_gemini_pro_model.generate_content(f"Given the Google Gemini Pro analysis, what is the numeric investment recommendation on a scale of 1-10 of the company stock ticker ?: {analysis.text}?")
+    return rating
+
+def extract_investment_recommendation_2(analysis, ticker):
+    start_time = time.time()
+    try:
+        rating = float(re.findall(r"[2-9]", re.split(r"\srate\s|\srated\s|\srating\s", analysis.text)[-1])[0]) # \s[R|r]at[e|ed|ing]\s # [R|r]at[e|ed|ing] | # excluding 0,1,10 outliers (extremely low or high recommendation) # maybe refactor add rating|recommendation
+    except Exception as e:
+        print(str(e) + " - No (or issue with extracting) investment recommendation for: " + ticker + " on: " + str(datetime.now()) + ", Execution time: " + str(time.time() - start_time))
+        # rating = float(re.findall(r"[2-9]", re.split("[R|r]at[e|ed|ing]", analysis.text)[-1])[0])
+        rating = 0
+    print("Execution time: " + str(time.time() - start_time))
+    # rating = float(re.findall(r"[0-9]{1,2}" + " out of 10", analysis.text)[0].split()[0]) if re.findall(r"[0-9]{1,2}" + " out of 10", analysis.text) else float("NaN")
+    # rating = google_gemini_pro_model.generate_content(f"Given the Google Gemini Pro analysis, what is the numeric investment recommendation on a scale of 1-10 of the company stock ticker ?: {analysis.text}?")
+    return rating
 
 from pytrends.request import TrendReq
 
@@ -913,7 +976,7 @@ def get_tickers_to_avoid_in_alpaca(df_usa_alpaca_tickers_of_the_day): # usa_alpa
             tickers_end_with_y_reflected_on_alpaca.append(ticker) # for other future purposes
     return tickers_end_with_y_not_refleced_on_alpaca # [, tickers_end_with_y_reflected_on_alpaca]
 
-def tickers_to_avoid(df_usa_alpaca_tickers_of_the_day, end_day): # probably refactor
+def get_tickers_to_avoid(df_usa_alpaca_tickers_of_the_day, end_day): # probably refactor
     if (not type(end_day) is datetime):
         print("End day must pass be of type datetime")
         return {}
@@ -966,50 +1029,6 @@ def update_portfolio_buy_and_sell_tickers(portfolio, tickers_to_buy, tickers_to_
                 portfolio['balance']['usd'] = portfolio['balance']['usd'] - price*quantity
                 portfolio['open'].loc[ticker, ['position', 'balance', 'buy_date', 'buy_price', 'current_date', 'current_price', 'current_roi', 'fmp_24h_vol', 'gtrends_15d', 'rank_rise_d', 'tsl_armed', 'trade_notes']] = [('long' if not paper_trading else 'long-p'), quantity] + [buy_date, price]*2 + [0, fmp_24h_vol, google_trends_slope, rank_rise_d, False, trade_notes] # assuming buying at ~20 PST which means order gets executed at start of day next day every day # maybe refactor 'long-p' - alpaca
     return portfolio
-
-def get_tickers_with_stock_splits_in_day_yfinance(date, tickers_for_period): # date is a string in format '%Y-%m-%d' (example: '2021-03-12')
-    tickers = {} # , random_int , randint(0, 100)
-    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10 7 4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'} # {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'}
-    # if random_int % 20 == 0:
-    #     print("Sleeping 30 seconds for random int " + str(random_int) + " % 20 == 0 on: " + str(datetime.now()))
-    #     time.sleep(30)
-    site_url = 'https://finance.yahoo.com/calendar/splits/?day=' + date # '2020-11-09'
-    resp = requests.get(site_url, headers=headers) #  # if random_int % 2 != 0 else requests.get(site_url, headers=headers[1])
-    soup = bs.BeautifulSoup(resp.text, 'html.parser')
-    table = soup.find('table', {'class': 'W(100%)'})
-    for row in table.findAll('tr')[1:]:
-        tds = row.findAll('td')
-        ticker = tds[0].text.strip()
-        split_ratio_text = tds[4].text.strip() if (tds[4].text.strip() and tds[4].text.strip() != '-') else "1.00 - 1.00"
-        try:
-            split_ratio = float(split_ratio_text.split("-")[0]) / float(split_ratio_text.split("-")[1]) # yahoo finance must have switched ratio format in 2023, used to be: float(split_ratio_text.split("-")[1]) / float(split_ratio_text.split("-")[0])
-        except Exception as e:
-            print(str(e) + " - Issue with split_ratio_text on date: " + date + ", skipping " + ticker)
-            continue
-        ex_date = datetime.strptime(date, '%Y-%m-%d') # datetime.strptime(tds[2].text.strip(), '%b %d, %Y')
-        if ticker in tickers_for_period:
-            print(ticker + ": multiple splits in time period " + str(tickers_for_period[ticker]) + " with split_ratio: " + str(split_ratio) + " on date: " + date)
-            tickers[ticker] = tickers_for_period[ticker] + [{'split_ratio': split_ratio, 'ex_date': ex_date}] # split_ratio = tickers_for_period[ticker]['split_ratio'] * split_ratio
-        else:
-            tickers[ticker] = [{'split_ratio': split_ratio, 'ex_date': ex_date}]
-    return tickers
-
-def tickers_with_stock_splits_in_period_yfinance(start_day, **params): # no end day specified since end day will always be current day since if end day is not current day and ticker split after the end_day then the daily yahoo finance prices will be updated and reflect the stock split but the hourly yahoo finance prices will reflect the stock prices at that day
-    tickers_for_period = {}
-    stop_day, end_day = start_day, datetime.now() # don't allow stop_day to be less than start_day since if stock split before start_day then price change should already be accounted for
-    usa_holidays = params['usa_holidays'] if 'usa_holidays' in params else {}
-    count = 0
-    while stop_day.date() <= end_day.date():
-        count += 1
-        if count % 40 == 0: # maybe refactor take out since unlikely this will hit: 2000/365: 5.47 years
-            print("Sleeping 7min every 40 requests on: " + str(datetime.now()))
-            time.sleep(7*60)
-        tickers_for_day = _fetch_data(get_tickers_with_stock_splits_in_day_yfinance, params={'date': stop_day.strftime('%Y-%m-%d'), 'tickers_for_period': tickers_for_period}, error_str=" - No (or issue with) tickers with stock splits on date: " + str(stop_day) + ", on: " + str(datetime.now()), empty_data={})
-        tickers_for_period = {**tickers_for_period, **tickers_for_day}
-        stop_day = stop_day + timedelta(days=1)
-        while stop_day.weekday() > 4 or (stop_day.replace(hour=0, minute=0, second=0, microsecond=0) in usa_holidays): # interval_start_date/stop_day in usa_holidays # stop_day = (stop_day + timedelta(days=1)) if (stop_day.weekday() < 4) else (stop_day + timedelta(days=7-stop_day.weekday())) # to avoid weekends, refactor to avoid holidays (2020-05-25)
-            stop_day = stop_day + timedelta(days=1)
-    return tickers_for_period
 
 def get_sp500_ranked_tickers_by_marketbeat():
     resp = requests.get('https://www.marketbeat.com/types-of-stock/sp-500-stocks/') # , verify=False # ISSUE - site doesn't update data daily it's a 1 day lag, 'http://en.wikipedia.org/wiki/List_of_S%26P_500_companies
@@ -1075,12 +1094,12 @@ def run_portfolio_zr(portfolio, start_day=None, end_day=None, zr_sell=True, pape
         print("Error (backtesting and not paper trading) or back running")
         return portfolio
     if back_testing:
-        tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else tickers_with_stock_splits_in_period_fmp(start_day=start_day) # since difference between daily (updated) and hourly (not updated) yahoo finance data for stocks that split after start day - this line in update_portfolio_postions_back_testing(): stop_day.date() < tickers_with_stock_splits[ticker]['ex_date'].date() should take care of issue
+        tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else get_tickers_with_stock_splits_fmp(start_day=start_day) # since difference between daily (updated) and hourly (not updated) yahoo finance data for stocks that split after start day - this line in update_portfolio_postions_back_testing(): stop_day.date() < tickers_with_stock_splits[ticker]['ex_date'].date() should take care of issue
         if 'tickers_to_avoid' in params:
             tickers_to_avoid = params['tickers_to_avoid']
         else:
             df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
-            tickers_to_avoid = tickers_to_avoid(df_tickers_end_day, end_day)
+            tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
         count = 0 # since unresolved OSError: (50, 'ENETDOWN'/etc.), pause 60s every 30 days (most recently errored 2 months out)
     usa_holidays = usa_cal.holidays(start=start_day.replace(month=1, day=1).strftime('%Y-%m-%d'), end=end_day.replace(month=12, day=31).strftime('%Y-%m-%d')).to_pydatetime() # usa_holidays = holidays.UnitedStates() # usa instead of us to be consistent with folder name and to be consistent across country names # only USA holidays for now since only working with tickers listed on USA exchanges
     while stop_day.date() <= end_day.date():
@@ -1139,12 +1158,12 @@ def run_portfolio_rr(portfolio, start_day=None, end_day=None, rr_sell=True, pape
         print("Error (backtesting and not paper trading) or back running")
         return portfolio
     if back_testing:
-        tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else tickers_with_stock_splits_in_period_fmp(start_day=start_day)
+        tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else get_tickers_with_stock_splits_fmp(start_day=start_day)
         if 'tickers_to_avoid' in params:
             tickers_to_avoid = params['tickers_to_avoid']
         else:
             df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
-            tickers_to_avoid = tickers_to_avoid(df_tickers_end_day, end_day)
+            tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
         count = 0 # since unresolved OSError: (50, 'ENETDOWN'/etc.), pause 60s every 30 days (most recently errored 2 months out)
     usa_holidays = usa_cal.holidays(start=start_day.replace(month=1, day=1).strftime('%Y-%m-%d'), end=end_day.replace(month=12, day=31).strftime('%Y-%m-%d')).to_pydatetime() # usa instead of us to be consistent with folder name and to be consistent across country names
     while stop_day.date() <= end_day.date():
@@ -1206,12 +1225,12 @@ def run_portfolio_tilupccu(portfolio, start_day=None, end_day=None, paper_tradin
         print("Error (backtesting and not paper trading) or back running")
         return portfolio
     if back_testing:
-        tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else tickers_with_stock_splits_in_period_fmp(start_day=start_day)
+        tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else get_tickers_with_stock_splits_fmp(start_day=start_day)
         if 'tickers_to_avoid' in params:
             tickers_to_avoid = params['tickers_to_avoid']
         else:
             df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
-            tickers_to_avoid = tickers_to_avoid(df_tickers_end_day, end_day)
+            tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
         count = 0 # since unresolved OSError: (50, 'ENETDOWN'/etc.), pause 60s every 30 days (most recently errored 2 months out)
     usa_holidays = usa_cal.holidays(start=start_day.replace(month=1, day=1).strftime('%Y-%m-%d'), end=end_day.replace(month=12, day=31).strftime('%Y-%m-%d')).to_pydatetime() # usa instead of us to be consistent with folder name and to be consistent across country names
     while stop_day.date() <= end_day.date():
@@ -1286,12 +1305,12 @@ def run_portfolio_mmtv(portfolio, start_day=None, end_day=None, mmtv_sell=True, 
         print("Error (backtesting and not paper trading) or back running")
         return portfolio
     if back_testing:
-        tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else tickers_with_stock_splits_in_period_fmp(start_day=start_day)
+        tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else get_tickers_with_stock_splits_fmp(start_day=start_day)
         if 'tickers_to_avoid' in params:
             tickers_to_avoid = params['tickers_to_avoid']
         else:
             df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
-            tickers_to_avoid = tickers_to_avoid(df_tickers_end_day, end_day)
+            tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
         count = 0 # since unresolved OSError: (50, 'ENETDOWN'/etc.), pause 60s every 30 days (most recently errored 2 months out)
     usa_holidays = usa_cal.holidays(start=start_day.replace(month=1, day=1).strftime('%Y-%m-%d'), end=end_day.replace(month=12, day=31).strftime('%Y-%m-%d')).to_pydatetime() # usa instead of us to be consistent with folder name and to be consistent across country names
     while stop_day.date() <= end_day.date():
@@ -1374,12 +1393,12 @@ def run_portfolio_random_sp500(portfolio, start_day=None, end_day=None, random_s
         print("Error (backtesting and not paper trading) or back running")
         return portfolio
     if back_testing:
-        tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else tickers_with_stock_splits_in_period_fmp(start_day=start_day)
+        tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else get_tickers_with_stock_splits_fmp(start_day=start_day)
         if 'tickers_to_avoid' in params:
             tickers_to_avoid = params['tickers_to_avoid']
         else:
             df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
-            tickers_to_avoid = tickers_to_avoid(df_tickers_end_day, end_day)
+            tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
         count = 0 # since unresolved OSError: (50, 'ENETDOWN'/etc.), pause 60s every 30 days (most recently errored 2 months out)
     while stop_day.date() <= end_day.date():
         if not (portfolio['open']['current_date'] >= stop_day).any(): # in case re-run existing portfolio over same days to avoid back running (and conserve time): avoid selling existing tickers incorrectly to TSL (too early) due to tsl_max_price set on future day or selling/buying existing/new tickers incorrectly with algorithm logic # assuming datetime is always in 13:00:00
@@ -1453,12 +1472,12 @@ def run_portfolio_mm(portfolio, start_day=None, end_day=None, paper_trading=True
         print("Error (backtesting and not paper trading) or back running")
         return portfolio
     if back_testing:
-        tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else tickers_with_stock_splits_in_period_fmp(start_day=start_day)
+        tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else get_tickers_with_stock_splits_fmp(start_day=start_day)
         if 'tickers_to_avoid' in params:
             tickers_to_avoid = params['tickers_to_avoid']
         else:
             df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
-            tickers_to_avoid = tickers_to_avoid(df_tickers_end_day, end_day)
+            tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
         count = 0 # since unresolved OSError: (50, 'ENETDOWN'/etc.), pause 60s every 30 days (most recently errored 2 months out)
     usa_holidays = usa_cal.holidays(start=start_day.replace(month=1, day=1).strftime('%Y-%m-%d'), end=end_day.replace(month=12, day=31).strftime('%Y-%m-%d')).to_pydatetime() # usa instead of us to be consistent with folder name and to be consistent across country names
     while stop_day.date() <= end_day.date():
@@ -1519,12 +1538,12 @@ def run_portfolio_ai_recommendations_in_sector(portfolio, start_day=None, end_da
         print("Error backtesting (no historical stock news enabled) or (backtesting and not paper trading) or back running")
         return portfolio
     if back_testing:
-        tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else tickers_with_stock_splits_in_period_fmp(start_day=start_day) # since difference between daily (updated) and hourly (not updated) yahoo finance data for stocks that split after start day - this line in update_portfolio_postions_back_testing(): stop_day.date() < tickers_with_stock_splits[ticker]['ex_date'].date() should take care of issue
+        tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else get_tickers_with_stock_splits_fmp(start_day=start_day) # since difference between daily (updated) and hourly (not updated) yahoo finance data for stocks that split after start day - this line in update_portfolio_postions_back_testing(): stop_day.date() < tickers_with_stock_splits[ticker]['ex_date'].date() should take care of issue
         if 'tickers_to_avoid' in params:
             tickers_to_avoid = params['tickers_to_avoid']
         else:
             df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
-            tickers_to_avoid = tickers_to_avoid(df_tickers_end_day, end_day)
+            tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
         count = 0 # since unresolved OSError: (50, 'ENETDOWN'/etc.), pause 60s every 30 days (most recently errored 2 months out)
     ticker_count = 0
     usa_holidays = usa_cal.holidays(start=start_day.replace(month=1, day=1).strftime('%Y-%m-%d'), end=end_day.replace(month=12, day=31).strftime('%Y-%m-%d')).to_pydatetime() # usa_holidays = holidays.UnitedStates() # usa instead of us to be consistent with folder name and to be consistent across country names # only USA holidays for now since only working with tickers listed on USA exchanges
@@ -1594,12 +1613,12 @@ def run_portfolio_top_n_gainers_ai_analysis(portfolio, start_day=None, end_day=N
         print("Error backtesting (no historical stock news enabled) or (backtesting and not paper trading) or back running")
         return portfolio
     if back_testing:
-        tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else tickers_with_stock_splits_in_period_fmp(start_day=start_day) # since difference between daily (updated) and hourly (not updated) yahoo finance data for stocks that split after start day - this line in update_portfolio_postions_back_testing(): stop_day.date() < tickers_with_stock_splits[ticker]['ex_date'].date() should take care of issue
+        tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else get_tickers_with_stock_splits_fmp(start_day=start_day) # since difference between daily (updated) and hourly (not updated) yahoo finance data for stocks that split after start day - this line in update_portfolio_postions_back_testing(): stop_day.date() < tickers_with_stock_splits[ticker]['ex_date'].date() should take care of issue
         if 'tickers_to_avoid' in params:
             tickers_to_avoid = params['tickers_to_avoid']
         else:
             df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
-            tickers_to_avoid = tickers_to_avoid(df_tickers_end_day, end_day)
+            tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
         count = 0 # since unresolved OSError: (50, 'ENETDOWN'/etc.), pause 60s every 30 days (most recently errored 2 months out)
     usa_holidays = usa_cal.holidays(start=start_day.replace(month=1, day=1).strftime('%Y-%m-%d'), end=end_day.replace(month=12, day=31).strftime('%Y-%m-%d')).to_pydatetime() # usa_holidays = holidays.UnitedStates() # usa instead of us to be consistent with folder name and to be consistent across country names # only USA holidays for now since only working with tickers listed on USA exchanges
     while stop_day.date() <= end_day.date():
@@ -1683,12 +1702,12 @@ def run_portfolio_senate_trading(portfolio, start_day=None, end_day=None, senate
         print("Error (backtesting and not paper trading) or back running")
         return portfolio
     if back_testing:
-        tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else tickers_with_stock_splits_in_period_fmp(start_day=start_day)
+        tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else get_tickers_with_stock_splits_fmp(start_day=start_day)
         if 'tickers_to_avoid' in params:
             tickers_to_avoid = params['tickers_to_avoid']
         else:
             df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
-            tickers_to_avoid = tickers_to_avoid(df_tickers_end_day, end_day)
+            tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
         count = 0 # since unresolved OSError: (50, 'ENETDOWN'/etc.), pause 60s every 30 days (most recently errored 2 months out)
     if 'senate_timestamps_and_tickers_inflows_and_outflows' in params:
         senate_timestamps_and_tickers_inflows_and_outflows = params['senate_timestamps_and_tickers_inflows_and_outflows']
@@ -2006,7 +2025,7 @@ def portfolio_trading(portfolio, paper_trading=True, paper_trading_on_used_accou
                 if not paper_trading: # only align buying power when not paper trading since when paper trading balance should be aligned with current (paper) trading not actual buying power, aligning buying power after switching over from paper trading to not paper trading helps to deal with delisted tickers
                     account = _fetch_data(alpaca_api.get_account, params={}, error_str=" - No account from Alpaca on: " + str(datetime.now()), empty_data = {})
                     portfolio = portfolio_align_buying_power_with_alpaca(portfolio=portfolio, alpaca_account=account) if account else portfolio # refactor issue if save_usa_alpaca_by_yf_tickers_ms_zr_data() runs into next day # maybe refactor, quick fix to ensure program continues to run if there is an error fetching alpaca_api.get_account # not declaring account as own variable and possibly sms messaging account.equity since have Alpaca App on phone
-                tickers_to_avoid = tickers_to_avoid(df_tickers_interval_today, todays_date) # good to check daily Alpaca might update
+                tickers_to_avoid = get_tickers_to_avoid(df_tickers_interval_today, todays_date) # good to check daily Alpaca might update
                 portfolio = run_portfolio(portfolio=portfolio, start_day=(todays_date - timedelta(days=DAYS)), end_day=todays_date, paper_trading=paper_trading, tickers_to_avoid=tickers_to_avoid) # refactor issue if save_usa_alpaca_by_yf_tickers_ms_zr_data() runs into next day # run_portfolio() executed when saving tickers data even though buy prices are quite a bit off (>= 7%, retry orders correct some of them) since prefer to have run_portfolio() run (and orders set in) right after tickers data is saved to deal with potential errors and to have buy_date the same as day when saved tickers, not to have to wait over a weekend, to mimick crypto.py order, and to not have to relabel saved data as start of business day (instead of currently end of business day) to avoid back running # , rr_buy=(True if not buying_disabled else False) # maybe refactor can get rid DAYS = portfolio['constants']['days'] and start_day=(todays_date - timedelta(days=DAYS)) logic since this is default for run_portfolio_algorithm
                 portfolio_has_run = True
                 save_portfolio_backup(portfolio, date=todays_date.strftime('%Y-%m-%d')) # save here since market closed when this code runs
