@@ -1093,13 +1093,13 @@ def run_portfolio_zr(portfolio, start_day=None, end_day=None, zr_sell=True, pape
     if (back_testing and not paper_trading) or (not back_testing and (stop_day < datetime.now() - timedelta(hours=17.5))): # 6:30am (new data arrives - except weekends & holidays) - 01:00pm previous day = 17.5 # assuming datetime input is always in 13:00:00 and run after market close of the stop_day # (stop_day.date() != datetime.now().date()) # maybe refactor here and below, allow 24 hours or more custom (especially if run update_portfolio_buy_and_sell_tickers() more than once per day after market hours as it is now or if account for running on weekends) # could also be more like in crypto.py or add full datetime comparison # here and below no need to check for (end_day.date() <= start_day.date()) since while loop won't execute (since stop_day is always > start_day will be greater than end_day)
         print("Error (backtesting and not paper trading) or back running")
         return portfolio
+    if 'tickers_to_avoid' in params: # this is needed for backtesting and real running
+        tickers_to_avoid = params['tickers_to_avoid']
+    else:
+        df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
+        tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
     if back_testing:
         tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else get_tickers_with_stock_splits_fmp(start_day=start_day) # since difference between daily (updated) and hourly (not updated) yahoo finance data for stocks that split after start day - this line in update_portfolio_postions_back_testing(): stop_day.date() < tickers_with_stock_splits[ticker]['ex_date'].date() should take care of issue
-        if 'tickers_to_avoid' in params:
-            tickers_to_avoid = params['tickers_to_avoid']
-        else:
-            df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
-            tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
         count = 0 # since unresolved OSError: (50, 'ENETDOWN'/etc.), pause 60s every 30 days (most recently errored 2 months out)
     usa_holidays = usa_cal.holidays(start=start_day.replace(month=1, day=1).strftime('%Y-%m-%d'), end=end_day.replace(month=12, day=31).strftime('%Y-%m-%d')).to_pydatetime() # usa_holidays = holidays.UnitedStates() # usa instead of us to be consistent with folder name and to be consistent across country names # only USA holidays for now since only working with tickers listed on USA exchanges
     while stop_day.date() <= end_day.date():
@@ -1157,13 +1157,13 @@ def run_portfolio_rr(portfolio, start_day=None, end_day=None, rr_sell=True, pape
     if (back_testing and not paper_trading) or (not back_testing and (stop_day < datetime.now() - timedelta(hours=17.5))):
         print("Error (backtesting and not paper trading) or back running")
         return portfolio
+    if 'tickers_to_avoid' in params:
+        tickers_to_avoid = params['tickers_to_avoid']
+    else:
+        df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
+        tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
     if back_testing:
         tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else get_tickers_with_stock_splits_fmp(start_day=start_day)
-        if 'tickers_to_avoid' in params:
-            tickers_to_avoid = params['tickers_to_avoid']
-        else:
-            df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
-            tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
         count = 0 # since unresolved OSError: (50, 'ENETDOWN'/etc.), pause 60s every 30 days (most recently errored 2 months out)
     usa_holidays = usa_cal.holidays(start=start_day.replace(month=1, day=1).strftime('%Y-%m-%d'), end=end_day.replace(month=12, day=31).strftime('%Y-%m-%d')).to_pydatetime() # usa instead of us to be consistent with folder name and to be consistent across country names
     while stop_day.date() <= end_day.date():
@@ -1224,13 +1224,13 @@ def run_portfolio_tilupccu(portfolio, start_day=None, end_day=None, paper_tradin
     if (back_testing and not paper_trading) or (not back_testing and (stop_day < datetime.now() - timedelta(hours=17.5))): # maybe refactor - time delay between when todays_data minute value and datetime.now() minute value can cause this to trigger when it maybe shouldn't
         print("Error (backtesting and not paper trading) or back running")
         return portfolio
+    if 'tickers_to_avoid' in params:
+        tickers_to_avoid = params['tickers_to_avoid']
+    else:
+        df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
+        tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
     if back_testing:
         tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else get_tickers_with_stock_splits_fmp(start_day=start_day)
-        if 'tickers_to_avoid' in params:
-            tickers_to_avoid = params['tickers_to_avoid']
-        else:
-            df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
-            tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
         count = 0 # since unresolved OSError: (50, 'ENETDOWN'/etc.), pause 60s every 30 days (most recently errored 2 months out)
     usa_holidays = usa_cal.holidays(start=start_day.replace(month=1, day=1).strftime('%Y-%m-%d'), end=end_day.replace(month=12, day=31).strftime('%Y-%m-%d')).to_pydatetime() # usa instead of us to be consistent with folder name and to be consistent across country names
     while stop_day.date() <= end_day.date():
@@ -1304,13 +1304,13 @@ def run_portfolio_mmtv(portfolio, start_day=None, end_day=None, mmtv_sell=True, 
     if (back_testing and not paper_trading) or (not back_testing and (stop_day < datetime.now() - timedelta(hours=17.5))):
         print("Error (backtesting and not paper trading) or back running")
         return portfolio
+    if 'tickers_to_avoid' in params:
+        tickers_to_avoid = params['tickers_to_avoid']
+    else:
+        df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
+        tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
     if back_testing:
         tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else get_tickers_with_stock_splits_fmp(start_day=start_day)
-        if 'tickers_to_avoid' in params:
-            tickers_to_avoid = params['tickers_to_avoid']
-        else:
-            df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
-            tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
         count = 0 # since unresolved OSError: (50, 'ENETDOWN'/etc.), pause 60s every 30 days (most recently errored 2 months out)
     usa_holidays = usa_cal.holidays(start=start_day.replace(month=1, day=1).strftime('%Y-%m-%d'), end=end_day.replace(month=12, day=31).strftime('%Y-%m-%d')).to_pydatetime() # usa instead of us to be consistent with folder name and to be consistent across country names
     while stop_day.date() <= end_day.date():
@@ -1392,13 +1392,13 @@ def run_portfolio_random_sp500(portfolio, start_day=None, end_day=None, random_s
     if (back_testing and not paper_trading) or (not back_testing and (stop_day < datetime.now() - timedelta(hours=17.5))):
         print("Error (backtesting and not paper trading) or back running")
         return portfolio
+    if 'tickers_to_avoid' in params:
+        tickers_to_avoid = params['tickers_to_avoid']
+    else:
+        df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
+        tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
     if back_testing:
         tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else get_tickers_with_stock_splits_fmp(start_day=start_day)
-        if 'tickers_to_avoid' in params:
-            tickers_to_avoid = params['tickers_to_avoid']
-        else:
-            df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
-            tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
         count = 0 # since unresolved OSError: (50, 'ENETDOWN'/etc.), pause 60s every 30 days (most recently errored 2 months out)
     while stop_day.date() <= end_day.date():
         if not (portfolio['open']['current_date'] >= stop_day).any(): # in case re-run existing portfolio over same days to avoid back running (and conserve time): avoid selling existing tickers incorrectly to TSL (too early) due to tsl_max_price set on future day or selling/buying existing/new tickers incorrectly with algorithm logic # assuming datetime is always in 13:00:00
@@ -1471,13 +1471,13 @@ def run_portfolio_mm(portfolio, start_day=None, end_day=None, paper_trading=True
     if (back_testing and not paper_trading) or (not back_testing and (stop_day < datetime.now() - timedelta(hours=17.5))): # maybe refactor - time delay between when todays_data minute value and datetime.now() minute value can cause this to trigger when it maybe shouldn't
         print("Error (backtesting and not paper trading) or back running")
         return portfolio
+    if 'tickers_to_avoid' in params:
+        tickers_to_avoid = params['tickers_to_avoid']
+    else:
+        df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
+        tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
     if back_testing:
         tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else get_tickers_with_stock_splits_fmp(start_day=start_day)
-        if 'tickers_to_avoid' in params:
-            tickers_to_avoid = params['tickers_to_avoid']
-        else:
-            df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
-            tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
         count = 0 # since unresolved OSError: (50, 'ENETDOWN'/etc.), pause 60s every 30 days (most recently errored 2 months out)
     usa_holidays = usa_cal.holidays(start=start_day.replace(month=1, day=1).strftime('%Y-%m-%d'), end=end_day.replace(month=12, day=31).strftime('%Y-%m-%d')).to_pydatetime() # usa instead of us to be consistent with folder name and to be consistent across country names
     while stop_day.date() <= end_day.date():
@@ -1537,13 +1537,13 @@ def run_portfolio_ai_recommendations_in_sector(portfolio, start_day=None, end_da
     if back_testing or (back_testing and not paper_trading) or (not back_testing and (stop_day < datetime.now() - timedelta(hours=back_running_allowance))): # back_running allowance# (stop_day.date() != datetime.now().date()) # maybe refactor here and below, allow 24 hours or more custom (especially if run update_portfolio_buy_and_sell_tickers() more than once per day after market hours as it is now or if account for running on weekends) # could also be more like in crypto.py or add full datetime comparison # here and below no need to check for (end_day.date() <= start_day.date()) since while loop won't execute (since stop_day is always > start_day will be greater than end_day)
         print("Error backtesting (no historical stock news enabled) or (backtesting and not paper trading) or back running")
         return portfolio
+    if 'tickers_to_avoid' in params:
+        tickers_to_avoid = params['tickers_to_avoid']
+    else:
+        df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
+        tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
     if back_testing:
         tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else get_tickers_with_stock_splits_fmp(start_day=start_day) # since difference between daily (updated) and hourly (not updated) yahoo finance data for stocks that split after start day - this line in update_portfolio_postions_back_testing(): stop_day.date() < tickers_with_stock_splits[ticker]['ex_date'].date() should take care of issue
-        if 'tickers_to_avoid' in params:
-            tickers_to_avoid = params['tickers_to_avoid']
-        else:
-            df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
-            tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
         count = 0 # since unresolved OSError: (50, 'ENETDOWN'/etc.), pause 60s every 30 days (most recently errored 2 months out)
     ticker_count = 0
     usa_holidays = usa_cal.holidays(start=start_day.replace(month=1, day=1).strftime('%Y-%m-%d'), end=end_day.replace(month=12, day=31).strftime('%Y-%m-%d')).to_pydatetime() # usa_holidays = holidays.UnitedStates() # usa instead of us to be consistent with folder name and to be consistent across country names # only USA holidays for now since only working with tickers listed on USA exchanges
@@ -1612,13 +1612,13 @@ def run_portfolio_top_n_gainers_ai_analysis(portfolio, start_day=None, end_day=N
     if back_testing or (back_testing and not paper_trading) or (not back_testing and (stop_day < datetime.now() - timedelta(hours=back_running_allowance))): # back_running allowance# (stop_day.date() != datetime.now().date()) # maybe refactor here and below, allow 24 hours or more custom (especially if run update_portfolio_buy_and_sell_tickers() more than once per day after market hours as it is now or if account for running on weekends) # could also be more like in crypto.py or add full datetime comparison # here and below no need to check for (end_day.date() <= start_day.date()) since while loop won't execute (since stop_day is always > start_day will be greater than end_day)
         print("Error backtesting (no historical stock news enabled) or (backtesting and not paper trading) or back running")
         return portfolio
+    if 'tickers_to_avoid' in params:
+        tickers_to_avoid = params['tickers_to_avoid']
+    else:
+        df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
+        tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
     if back_testing:
         tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else get_tickers_with_stock_splits_fmp(start_day=start_day) # since difference between daily (updated) and hourly (not updated) yahoo finance data for stocks that split after start day - this line in update_portfolio_postions_back_testing(): stop_day.date() < tickers_with_stock_splits[ticker]['ex_date'].date() should take care of issue
-        if 'tickers_to_avoid' in params:
-            tickers_to_avoid = params['tickers_to_avoid']
-        else:
-            df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
-            tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
         count = 0 # since unresolved OSError: (50, 'ENETDOWN'/etc.), pause 60s every 30 days (most recently errored 2 months out)
     usa_holidays = usa_cal.holidays(start=start_day.replace(month=1, day=1).strftime('%Y-%m-%d'), end=end_day.replace(month=12, day=31).strftime('%Y-%m-%d')).to_pydatetime() # usa_holidays = holidays.UnitedStates() # usa instead of us to be consistent with folder name and to be consistent across country names # only USA holidays for now since only working with tickers listed on USA exchanges
     while stop_day.date() <= end_day.date():
@@ -1701,13 +1701,13 @@ def run_portfolio_senate_trading(portfolio, start_day=None, end_day=None, senate
     if (back_testing and not paper_trading) or (not back_testing and (stop_day < datetime.now() - timedelta(hours=17.5))):
         print("Error (backtesting and not paper trading) or back running")
         return portfolio
+    if 'tickers_to_avoid' in params:
+        tickers_to_avoid = params['tickers_to_avoid']
+    else:
+        df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
+        tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
     if back_testing:
         tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else get_tickers_with_stock_splits_fmp(start_day=start_day)
-        if 'tickers_to_avoid' in params:
-            tickers_to_avoid = params['tickers_to_avoid']
-        else:
-            df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
-            tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
         count = 0 # since unresolved OSError: (50, 'ENETDOWN'/etc.), pause 60s every 30 days (most recently errored 2 months out)
     if 'senate_timestamps_and_tickers_inflows_and_outflows' in params:
         senate_timestamps_and_tickers_inflows_and_outflows = params['senate_timestamps_and_tickers_inflows_and_outflows']
@@ -1763,6 +1763,11 @@ def run_portfolio_sma_mm(portfolio, start_day=None, end_day=None, sma_mm_sell=Tr
     end_day = end_day if end_day else datetime.now() # maybe refactor, markets are from 9:30 - 16:00 EST / 6:30 - 13:00 EST
     start_day = start_day if start_day else end_day - timedelta(days=DAYS)
     stop_day = datetime.now() # start_day + timedelta(days=DAYS)
+    if 'tickers_to_avoid' in params:
+        tickers_to_avoid = params['tickers_to_avoid']
+    else:
+        df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
+        tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
     if stop_day.hour > 18: # assuming only called / running on market days / weekdays
         tickers_to_sell = []
         for ticker in portfolio['open'].index:
@@ -2014,7 +2019,7 @@ def portfolio_trading(portfolio, paper_trading=True, paper_trading_on_used_accou
                 todays_date = datetime.now() # no need to change to 13:00:00 time since fmp calls take the date in simple string format (no %H:%M:%S): datetime_object.strftime('%Y-%m-%d')
                 df_tickers_interval_today = get_saved_tickers_data(date=todays_date.strftime('%Y-%m-%d'))
                 if df_tickers_interval_today.empty and download_and_save_tickers_data:
-                    save_usa_alpaca_tickers_fmp_data(date=todays_date.strftime('%Y-%m-%d')) # maybe refactor (especially if in timezone far off eastern), not using eastern since run late at night and could extend into next day (in eastern time)
+                    df_tickers_interval_today = save_usa_alpaca_tickers_fmp_data(date=todays_date.strftime('%Y-%m-%d')) # maybe refactor (especially if in timezone far off eastern), not using eastern since run late at night and could extend into next day (in eastern time) # set variable within if statement
                 else:
                     # df_tickers_interval_today = get_saved_tickers_data(date=todays_date.strftime('%Y-%m-%d'))
                     while df_tickers_interval_today.empty:
@@ -2025,7 +2030,6 @@ def portfolio_trading(portfolio, paper_trading=True, paper_trading_on_used_accou
                 if not paper_trading: # only align buying power when not paper trading since when paper trading balance should be aligned with current (paper) trading not actual buying power, aligning buying power after switching over from paper trading to not paper trading helps to deal with delisted tickers
                     account = _fetch_data(alpaca_api.get_account, params={}, error_str=" - No account from Alpaca on: " + str(datetime.now()), empty_data = {})
                     portfolio = portfolio_align_buying_power_with_alpaca(portfolio=portfolio, alpaca_account=account) if account else portfolio # refactor issue if save_usa_alpaca_by_yf_tickers_ms_zr_data() runs into next day # maybe refactor, quick fix to ensure program continues to run if there is an error fetching alpaca_api.get_account # not declaring account as own variable and possibly sms messaging account.equity since have Alpaca App on phone
-                df_tickers_interval_today = get_saved_tickers_data(date=todays_date.strftime('%Y-%m-%d')) # for main trading account with download_and_save_tickers_data=True since this variable is None and not set after save_usa_alpaca_tickers_fmp_data() is called
                 tickers_to_avoid = get_tickers_to_avoid(df_tickers_interval_today, todays_date) # good to check daily Alpaca might update
                 portfolio = run_portfolio(portfolio=portfolio, start_day=(todays_date - timedelta(days=DAYS)), end_day=todays_date, paper_trading=paper_trading, tickers_to_avoid=tickers_to_avoid) # refactor issue if save_usa_alpaca_by_yf_tickers_ms_zr_data() runs into next day # run_portfolio() executed when saving tickers data even though buy prices are quite a bit off (>= 7%, retry orders correct some of them) since prefer to have run_portfolio() run (and orders set in) right after tickers data is saved to deal with potential errors and to have buy_date the same as day when saved tickers, not to have to wait over a weekend, to mimick crypto.py order, and to not have to relabel saved data as start of business day (instead of currently end of business day) to avoid back running # , rr_buy=(True if not buying_disabled else False) # maybe refactor can get rid DAYS = portfolio['constants']['days'] and start_day=(todays_date - timedelta(days=DAYS)) logic since this is default for run_portfolio_algorithm
                 portfolio_has_run = True
