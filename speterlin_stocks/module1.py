@@ -962,8 +962,8 @@ def update_portfolio_postions_back_testing(portfolio, stop_day, end_day, **param
     return portfolio
 
 def get_tickers_to_avoid_in_alpaca(df_usa_alpaca_tickers_of_the_day): # usa_alpaca_tickers_end_with_y_with_no_current_alpaca_trade_data
-    if (not type(df_usa_alpaca_tickers_of_the_day) is pd.core.frame.DataFrame):
-        print("Must pass a dataframe as parameter")
+    if (not type(df_usa_alpaca_tickers_of_the_day) is pd.core.frame.DataFrame) or df_usa_alpaca_tickers_of_the_day.empty:
+        print("Must pass a non-empty dataframe as parameter")
         return {}
     tickers_end_with_y = df_usa_alpaca_tickers_of_the_day[df_usa_alpaca_tickers_of_the_day.index.str.endswith("Y")]
     tickers_end_with_y_not_refleced_on_alpaca, tickers_end_with_y_reflected_on_alpaca, count = {}, [], 0
@@ -2025,6 +2025,7 @@ def portfolio_trading(portfolio, paper_trading=True, paper_trading_on_used_accou
                 if not paper_trading: # only align buying power when not paper trading since when paper trading balance should be aligned with current (paper) trading not actual buying power, aligning buying power after switching over from paper trading to not paper trading helps to deal with delisted tickers
                     account = _fetch_data(alpaca_api.get_account, params={}, error_str=" - No account from Alpaca on: " + str(datetime.now()), empty_data = {})
                     portfolio = portfolio_align_buying_power_with_alpaca(portfolio=portfolio, alpaca_account=account) if account else portfolio # refactor issue if save_usa_alpaca_by_yf_tickers_ms_zr_data() runs into next day # maybe refactor, quick fix to ensure program continues to run if there is an error fetching alpaca_api.get_account # not declaring account as own variable and possibly sms messaging account.equity since have Alpaca App on phone
+                df_tickers_interval_today = get_saved_tickers_data(date=todays_date.strftime('%Y-%m-%d')) # for main trading account with download_and_save_tickers_data=True since this variable is None and not set after save_usa_alpaca_tickers_fmp_data() is called
                 tickers_to_avoid = get_tickers_to_avoid(df_tickers_interval_today, todays_date) # good to check daily Alpaca might update
                 portfolio = run_portfolio(portfolio=portfolio, start_day=(todays_date - timedelta(days=DAYS)), end_day=todays_date, paper_trading=paper_trading, tickers_to_avoid=tickers_to_avoid) # refactor issue if save_usa_alpaca_by_yf_tickers_ms_zr_data() runs into next day # run_portfolio() executed when saving tickers data even though buy prices are quite a bit off (>= 7%, retry orders correct some of them) since prefer to have run_portfolio() run (and orders set in) right after tickers data is saved to deal with potential errors and to have buy_date the same as day when saved tickers, not to have to wait over a weekend, to mimick crypto.py order, and to not have to relabel saved data as start of business day (instead of currently end of business day) to avoid back running # , rr_buy=(True if not buying_disabled else False) # maybe refactor can get rid DAYS = portfolio['constants']['days'] and start_day=(todays_date - timedelta(days=DAYS)) logic since this is default for run_portfolio_algorithm
                 portfolio_has_run = True
