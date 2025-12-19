@@ -4,7 +4,7 @@
 
 """
 
-__version__ = '1.0.7.2'
+__version__ = '1.0.8'
 
 # from .module1 import *
 # from . import module1

@@ -52,6 +52,7 @@ __all__ = [
     "update_portfolio_buy_and_sell_tickers",
     "get_sp500_ranked_tickers_by_marketbeat",
     "run_portfolio",
+    "check_for_basic_errors_and_set_general_params_for_run_portfolio",
     "run_portfolio_zr",
     "run_portfolio_rr",
     "run_portfolio_tilupccu",
@@ -1070,29 +1071,17 @@ def run_portfolio(portfolio, **params): # call portfolio = run_portfolio(portfol
 from pandas.tseries.holiday import USFederalHolidayCalendar # import holidays - add back if works
 usa_cal = USFederalHolidayCalendar()
 
-# Not merging run_portfolio_zr/rr into single function since even though it appears that sometimes only difference in algorithm functions is how to pick tickers there can be nuiances like if portfolio['constants']['up_down_move'] > 4: in run_portfolio_zr() and potentially more between portfolios
-# can make it run_portfolio_tr as well with tr_sell instead of zr_sell, 'Rating' instead of 'Zacks Rank', # maybe refactor and add error regarding start_day being before 2020-04-24 or 2020-05-08 since 05/08/2020 is first day with larger USA-listed stocks data (~4900 tickers) set, before that (04/24/2020 - 05/08/2020) it's smaller S&P 500 (505 tickers) data set, 04/24/2020 is first day with stock tickers data
-def run_portfolio_zr(portfolio, start_day=None, end_day=None, zr_sell=True, paper_trading=True, back_testing=False, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 240, 'days': 15}, **params): # refactor add paper_trading, back_testing # start_day and end_day are datetime objects # keep **params here and in run_portfolio_rr() so can use tickers_with_stock_splits for backtesting cases in which the fidelity service is down but the data for start_day and end_day is already loaded
-    print("running run_portfolio_zr()")
-    if portfolio['constants']['up_down_move'] > 4:
-        print("Error up/down move constant greater than 4")
-        return portfolio
-    UP_MOVE, DOWN_MOVE = portfolio['constants']['up_down_move'], -portfolio['constants']['up_down_move'] # maybe refactor and add similar to up_down_move with difference between start day's zacks rank and stop day's zacks rank,
-    DAYS = portfolio['constants']['days']
-    # TAKE_PROFIT_PERCENTAGE = 1.0
-    # PRICE_UNCERTAINTY_PERCENTAGE = 0.05 # to reflect that can't always buy/sell at Yahoo Finance price and that stop loss and trailing stop loss orders can't always be fulfilled at the exact percentage
-    # SHORT = False # possibly add short logic
-    # get most exchange tickers listing
-    # exchange_prices = exchange_client.get_all_tickers()
-    end_day = end_day if end_day else datetime.now().replace(hour=13, minute=0, second=0, microsecond=0) # maybe refactor, markets are from 9:30 - 16:00 EST / 6:30 - 13:00 PST # maybe refactor - add precautionary check here and below to see if datetime.now() is after 13h
-    start_day = start_day if start_day else end_day - timedelta(days=DAYS)
-    stop_day = start_day + timedelta(days=DAYS)
-    # if start_day.date() < datetime.strptime('2020_05_08 13:00:00', '%Y_%m_%d %H:%M:%S').date(): #
-    #     print("Error no saved TradingView Ratings before 2020-05-08")
-    #     return portfolio
-    if (back_testing and not paper_trading) or (not back_testing and (stop_day < datetime.now() - timedelta(hours=17.5))): # 6:30am (new data arrives - except weekends & holidays) - 01:00pm previous day = 17.5 # assuming datetime input is always in 13:00:00 and run after market close of the stop_day # (stop_day.date() != datetime.now().date()) # maybe refactor here and below, allow 24 hours or more custom (especially if run update_portfolio_buy_and_sell_tickers() more than once per day after market hours as it is now or if account for running on weekends) # could also be more like in crypto.py or add full datetime comparison # here and below no need to check for (end_day.date() <= start_day.date()) since while loop won't execute (since stop_day is always > start_day will be greater than end_day)
+def check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, back_running_allowance=17.5, **params):
+    if (back_testing and not paper_trading) or (not back_testing and (stop_day < datetime.now() - timedelta(hours=back_running_allowance))): # back_running_allowance=11 for airs for some reason # 6:30am (new data arrives - except weekends & holidays) - 01:00pm previous day = 17.5 # assuming datetime input is always in 13:00:00 and run after market close of the stop_day # (stop_day.date() != datetime.now().date()) # maybe refactor here and below, allow 24 hours or more custom (especially if run update_portfolio_buy_and_sell_tickers() more than once per day after market hours as it is now or if account for running on weekends) # could also be more like in crypto.py or add full datetime comparison # here and below no need to check for (end_day.date() <= start_day.date()) since while loop won't execute (since stop_day is always > start_day will be greater than end_day)
         print("Error (backtesting and not paper trading) or back running")
-        return portfolio
+        return ["Error", portfolio, None, None, None, None, None, None, None, None]
+    days = portfolio['constants']['days']
+    end_day = end_day if end_day else datetime.now().replace(hour=13, minute=0, second=0, microsecond=0) # maybe refactor, markets are from 9:30 - 16:00 EST / 6:30 - 13:00 PST # maybe refactor - add precautionary check here and below to see if datetime.now() is after 13h
+    start_day = start_day if start_day else end_day - timedelta(days=days)
+    stop_day = start_day + timedelta(days=days)
+    if start_day.date() < datetime.strptime('2020_05_08 13:00:00', '%Y_%m_%d %H:%M:%S').date():
+        print("Error saved S&P 500 tickers data with ['zr'] ordered alphabetically rather than by S&P 500 rank on 2020-04-24 and 2020-04-27, only have S&P 500 ranked (not by Market Cap) tickers data before 2020-05-08") # ['zr'] to match other error strings # "Error no saved TradingView Ratings before 2020-05-08"
+        return ["Error", portfolio, None, None, None, None, None, None, None, None]
     if 'tickers_to_avoid' in params: # this is needed for backtesting and real running
         tickers_to_avoid = params['tickers_to_avoid']
     else:
@@ -1101,7 +1090,29 @@ def run_portfolio_zr(portfolio, start_day=None, end_day=None, zr_sell=True, pape
     if back_testing:
         tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else get_tickers_with_stock_splits_fmp(start_day=start_day) # since difference between daily (updated) and hourly (not updated) yahoo finance data for stocks that split after start day - this line in update_portfolio_postions_back_testing(): stop_day.date() < tickers_with_stock_splits[ticker]['ex_date'].date() should take care of issue
         count = 0 # since unresolved OSError: (50, 'ENETDOWN'/etc.), pause 60s every 30 days (most recently errored 2 months out)
+    else:
+        tickers_with_stock_splits, count = None, None
     usa_holidays = usa_cal.holidays(start=start_day.replace(month=1, day=1).strftime('%Y-%m-%d'), end=end_day.replace(month=12, day=31).strftime('%Y-%m-%d')).to_pydatetime() # usa_holidays = holidays.UnitedStates() # usa instead of us to be consistent with folder name and to be consistent across country names # only USA holidays for now since only working with tickers listed on USA exchanges
+    # TAKE_PROFIT_PERCENTAGE = 1.0
+    # PRICE_UNCERTAINTY_PERCENTAGE = 0.05 # to reflect that can't always buy/sell at Yahoo Finance price and that stop loss and trailing stop loss orders can't always be fulfilled at the exact percentage
+    # SHORT = False # possibly add short logic
+    # get most exchange tickers listing
+    # exchange_prices = exchange_client.get_all_tickers()
+    return ["Success", portfolio, days, end_day, start_day, stop_day, tickers_to_avoid, tickers_with_stock_splits, count, usa_holidays]
+
+# Not merging run_portfolio_zr/rr into single function since even though it appears that sometimes only difference in algorithm functions is how to pick tickers there can be nuiances like if portfolio['constants']['up_down_move'] > 4: in run_portfolio_zr() and potentially more between portfolios
+# can make it run_portfolio_tr as well with tr_sell instead of zr_sell, 'Rating' instead of 'Zacks Rank', # maybe refactor and add error regarding start_day being before 2020-04-24 or 2020-05-08 since 05/08/2020 is first day with larger USA-listed stocks data (~4900 tickers) set, before that (04/24/2020 - 05/08/2020) it's smaller S&P 500 (505 tickers) data set, 04/24/2020 is first day with stock tickers data
+def run_portfolio_zr(portfolio, start_day=None, end_day=None, zr_sell=True, paper_trading=True, back_testing=False, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 240, 'days': 15}, **params): # refactor add paper_trading, back_testing # start_day and end_day are datetime objects # keep **params here and in run_portfolio_rr() so can use tickers_with_stock_splits for backtesting cases in which the fidelity service is down but the data for start_day and end_day is already loaded
+    print("running run_portfolio_zr()")
+    # Basic error checks for now
+    if (not type(portfolio['constants']['up_down_move']) is int) or not (1 <= portfolio['constants']['up_down_move'] <= 4): # here and below chatgpt simpler answer to: (portfolio['constants']['up_down_move'] < 0) or (portfolio['constants']['up_down_move'] > 4)
+        print("Error up/down move constant is not an int within 1-4 inclusive")
+        return portfolio
+    UP_MOVE, DOWN_MOVE = portfolio['constants']['up_down_move'], -portfolio['constants']['up_down_move'] # maybe refactor and add similar to up_down_move with difference between start day's zacks rank and stop day's zacks rank,
+    success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_to_avoid, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
+    if success_or_error == "Error":
+        print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio, returning")
+        return portfolio
     while stop_day.date() <= end_day.date():
         if not (portfolio['open']['current_date'] >= stop_day).any(): # in case re-run existing portfolio over same days to avoid back running (and conserve time): avoid selling existing tickers incorrectly to TSL (too early) due to tsl_max_price set on future day or selling/buying existing/new tickers incorrectly with algorithm logic # assuming datetime is always in 13:00:00
             if back_testing:
@@ -1141,31 +1152,14 @@ def run_portfolio_zr(portfolio, start_day=None, end_day=None, zr_sell=True, pape
 
 def run_portfolio_rr(portfolio, start_day=None, end_day=None, rr_sell=True, paper_trading=True, back_testing=False, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 240, 'days': 15}, **params): # 04/24/2020 and 04/27/2020 doesn't have proper ranking, before 05/08/2020 only have S&P 500 Rank which is not Market Cap rank # maybe refactor rr_buy/sell to algo_buy/sell, especially if add more algorithms # , rr_buy=True
     print("running run_portfolio_rr()")
+    if (not type(portfolio['constants']['up_down_move']) is int) or not (1 <= portfolio['constants']['up_down_move'] <= 100): #  (portfolio['constants']['up_down_move'] < 0) or (portfolio['constants']['up_down_move'] > 100)
+        print("Error up/down move constant is not an int within 1-100 inclusive")
+        return portfolio
     UP_MOVE, DOWN_MOVE = portfolio['constants']['up_down_move'], -portfolio['constants']['up_down_move']
-    DAYS = portfolio['constants']['days']
-    # TAKE_PROFIT_PERCENTAGE = 1.0
-    # PRICE_UNCERTAINTY_PERCENTAGE = 0.05 # to reflect that can't always buy/sell at Yahoo Finance price and that stop loss and trailing stop loss orders can't always be fulfilled at the exact percentage
-    # SHORT = False # possibly add short logic
-    # get most exchange tickers listing
-    # exchange_prices = exchange_client.get_all_tickers()
-    end_day = end_day if end_day else datetime.now().replace(hour=13, minute=0, second=0, microsecond=0) # maybe refactor, markets are from 9:30 - 16:00 EST / 6:30 - 13:00 EST
-    start_day = start_day if start_day else end_day - timedelta(days=DAYS)
-    stop_day = start_day + timedelta(days=DAYS)
-    if start_day.date() < datetime.strptime('2020_05_08 13:00:00', '%Y_%m_%d %H:%M:%S').date():
-        print("Error saved S&P 500 tickers data with ['zr'] ordered alphabetically rather than by S&P 500 rank on 2020-04-24 and 2020-04-27, only have S&P 500 ranked (not by Market Cap) tickers data before 2020-05-08") # ['zr'] to match other error strings
+    success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_to_avoid, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
+    if success_or_error == "Error":
+        print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio, returning")
         return portfolio
-    if (back_testing and not paper_trading) or (not back_testing and (stop_day < datetime.now() - timedelta(hours=17.5))):
-        print("Error (backtesting and not paper trading) or back running")
-        return portfolio
-    if 'tickers_to_avoid' in params:
-        tickers_to_avoid = params['tickers_to_avoid']
-    else:
-        df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
-        tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
-    if back_testing:
-        tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else get_tickers_with_stock_splits_fmp(start_day=start_day)
-        count = 0 # since unresolved OSError: (50, 'ENETDOWN'/etc.), pause 60s every 30 days (most recently errored 2 months out)
-    usa_holidays = usa_cal.holidays(start=start_day.replace(month=1, day=1).strftime('%Y-%m-%d'), end=end_day.replace(month=12, day=31).strftime('%Y-%m-%d')).to_pydatetime() # usa instead of us to be consistent with folder name and to be consistent across country names
     while stop_day.date() <= end_day.date():
         if not (portfolio['open']['current_date'] >= stop_day).any(): # in case re-run existing portfolio over same days to avoid back running (and conserve time): avoid selling existing tickers incorrectly to TSL (too early) due to tsl_max_price set on future day or selling/buying existing/new tickers incorrectly with algorithm logic # assuming datetime is always in 13:00:00
             if back_testing:
@@ -1208,31 +1202,18 @@ from collections import Counter
 
 def run_portfolio_tilupccu(portfolio, start_day=None, end_day=None, paper_trading=True, back_testing=False, top_interval_losers=100, custom_order=True, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 240, 'days': 15}, **params): # not implementing tilupccu_sell since don't want to set DOWN_MOVE as (~0, might buy some very undervalued tickers), could add tilupccu_sell that acts like tsl if pb >= 1
     print("running run_portfolio_tilupccu()")
-    UP_MOVE = portfolio['constants']['up_down_move'] # , DOWN_MOVE , -portfolio['constants']['up_down_move']
+    if (not type(portfolio['constants']['up_down_move']) is list) or len(portfolio['constants']['up_down_move']) != 2:
+        print("Error up/down move constant is not a list or a list with length 2")
+        return portfolio
+    PB_LIMIT, EPS_LIMIT = portfolio['constants']['up_down_move'] # , DOWN_MOVE , -portfolio['constants']['up_down_move']
+    if ((not type(PB_LIMIT) is int) or not (0 <= PB_LIMIT <= 2)) or ((not type(EPS_LIMIT) is int) or not (-10 <= EPS_LIMIT <= 10)): # [0]is pb [1] is eps
+        print("Error up/down move constants are not int or pb_limit (up/down[0]) is not within 0-2 inclusive or eps_limit (up/down[1]) is not within -10-10 inclusive")
+        return portfolio
     DAYS = portfolio['constants']['days']
-    # TAKE_PROFIT_PERCENTAGE = 1.0
-    # PRICE_UNCERTAINTY_PERCENTAGE = 0.05 # to reflect that can't always buy/sell at Yahoo Finance price and that stop loss and trailing stop loss orders can't always be fulfilled at the exact percentage
-    # SHORT = False # possibly add short logic
-    # get most exchange tickers listing
-    # exchange_prices = exchange_client.get_all_tickers()
-    end_day = end_day if end_day else datetime.now().replace(hour=13, minute=0, second=0, microsecond=0) # maybe refactor, markets are from 9:30 - 16:00 EST / 6:30 - 13:00 EST
-    start_day = start_day if start_day else end_day - timedelta(days=DAYS)
-    stop_day = start_day + timedelta(days=DAYS)
-    if start_day.date() < datetime.strptime('2020_07_21 13:00:00', '%Y_%m_%d %H:%M:%S').date():
-        print("Error no Yahoo Finance industry column for data before 2020-07-21") # ['zr'] to match other error strings
+    success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_to_avoid, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
+    if success_or_error == "Error":
+        print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio, returning")
         return portfolio
-    if (back_testing and not paper_trading) or (not back_testing and (stop_day < datetime.now() - timedelta(hours=17.5))): # maybe refactor - time delay between when todays_data minute value and datetime.now() minute value can cause this to trigger when it maybe shouldn't
-        print("Error (backtesting and not paper trading) or back running")
-        return portfolio
-    if 'tickers_to_avoid' in params:
-        tickers_to_avoid = params['tickers_to_avoid']
-    else:
-        df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
-        tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
-    if back_testing:
-        tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else get_tickers_with_stock_splits_fmp(start_day=start_day)
-        count = 0 # since unresolved OSError: (50, 'ENETDOWN'/etc.), pause 60s every 30 days (most recently errored 2 months out)
-    usa_holidays = usa_cal.holidays(start=start_day.replace(month=1, day=1).strftime('%Y-%m-%d'), end=end_day.replace(month=12, day=31).strftime('%Y-%m-%d')).to_pydatetime() # usa instead of us to be consistent with folder name and to be consistent across country names
     while stop_day.date() <= end_day.date():
         if not (portfolio['open']['current_date'] >= stop_day).any(): # in case re-run existing portfolio over same days to avoid back running (and conserve time): avoid selling existing tickers incorrectly to TSL (too early) due to tsl_max_price set on future day or selling/buying existing/new tickers incorrectly with algorithm logic # assuming datetime is always in 13:00:00
             if back_testing:
@@ -1273,7 +1254,7 @@ def run_portfolio_tilupccu(portfolio, start_day=None, end_day=None, paper_tradin
                         # for ticker in [top_interval_loser_ticker] + list(df_tickers_interval_stop[df_tickers_interval_stop['Industry'] == industry].index): # & (not df_tickers_interval_stop['P/B (FY)'].isnull())
                         pb_ttm = df_tickers_last_quality_data.loc[top_interval_loser_ticker, 'P/B (TTM)'] if df_tickers_last_quality_data.loc[top_interval_loser_ticker, 'P/B (TTM)'] else float("NaN") # ensure that it's a float("NaN") if None value # df_tickers_interval_stop # top_interval_loser_ticker is in df_tickers_interval_stop as per previous for loop (top_interval_loser_ticker in df_tickers_interval_stop.index) and
                         basic_eps = df_tickers_interval_stop.loc[top_interval_loser_ticker, 'Basic EPS (TTM)'] if 'Basic EPS (TTM)' in df_tickers_interval_stop else df_tickers_interval_stop.loc[top_interval_loser_ticker, 'Basic EPS (FY)'] if 'Basic EPS (FY)' in df_tickers_interval_stop else float("NaN")
-                        if peer_tickers_basic_eps_fy_filtered and ((len([basic_eps_fy for basic_eps_fy in peer_tickers_basic_eps_fy_filtered if basic_eps_fy >= 0]) / len(peer_tickers_basic_eps_fy_filtered)) >= 0.5) and (pb_ttm <= UP_MOVE[0]) and (basic_eps >= UP_MOVE[1]) and (top_interval_loser_ticker not in portfolio['open'].index): # ticker # [0] # maybe refactor industry considered strong if > 50% of similar companies have eps >= 0 # maybe add UP_MOVE for last_price_change
+                        if peer_tickers_basic_eps_fy_filtered and ((len([basic_eps_fy for basic_eps_fy in peer_tickers_basic_eps_fy_filtered if basic_eps_fy >= 0]) / len(peer_tickers_basic_eps_fy_filtered)) >= 0.5) and (pb_ttm <= PB_LIMIT) and (basic_eps >= EPS_LIMIT) and (top_interval_loser_ticker not in portfolio['open'].index): # ticker # [0] # maybe refactor industry considered strong if > 50% of similar companies have eps >= 0 # maybe add UP_MOVE for last_price_change
                             tickers_to_buy.append([top_interval_loser_ticker, last_price_change]) # top_interval_loser_ticker, last_price_change # tickers_to_buy.append([ticker, pb_fy]) # makes sense p/b remains p/b instead of (1-p/b) even though deceiving with rank_rise_d in portfolio dataframe when read portfolio type it's less confusing # p = 10 b = 100 => p/b = 0.1 and 0.9
                     if tickers_to_buy:
                         portfolio = update_portfolio_buy_and_sell_tickers(portfolio=portfolio, tickers_to_buy=sorted(tickers_to_buy, key=lambda x: x[1], reverse=False) if custom_order else tickers_to_buy, tickers_to_sell=[], tickers_to_avoid=tickers_to_avoid, stop_day=stop_day, paper_trading=paper_trading, back_testing=back_testing) # tickers_to_buy
@@ -1289,30 +1270,10 @@ from statistics import mean
 def run_portfolio_mmtv(portfolio, start_day=None, end_day=None, mmtv_sell=True, paper_trading=True, back_testing=False, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 240, 'days': 15}, **params): # 04/24/2020 and 04/27/2020 doesn't have proper ranking, before 05/08/2020 only have S&P 500 Rank which is not Market Cap rank # maybe refactor rr_buy/sell to algo_buy/sell, especially if add more algorithms # , rr_buy=True
     print("running run_portfolio_mmtv()")
     # UP_MOVE, DOWN_MOVE = portfolio['constants']['up_down_move'], -portfolio['constants']['up_down_move']
-    DAYS = portfolio['constants']['days']
-    # TAKE_PROFIT_PERCENTAGE = 1.0
-    # PRICE_UNCERTAINTY_PERCENTAGE = 0.05 # to reflect that can't always buy/sell at Yahoo Finance price and that stop loss and trailing stop loss orders can't always be fulfilled at the exact percentage
-    # SHORT = False # possibly add short logic
-    # get most exchange tickers listing
-    # exchange_prices = exchange_client.get_all_tickers()
-    end_day = end_day if end_day else datetime.now().replace(hour=13, minute=0, second=0, microsecond=0) # maybe refactor, markets are from 9:30 - 16:00 EST / 6:30 - 13:00 EST
-    start_day = start_day if start_day else end_day - timedelta(days=DAYS)
-    stop_day = start_day + timedelta(days=DAYS)
-    if start_day.date() < datetime.strptime('2020_05_08 13:00:00', '%Y_%m_%d %H:%M:%S').date():
-        print("Error saved S&P 500 tickers data with ['zr'] ordered alphabetically rather than by S&P 500 rank on 2020-04-24 and 2020-04-27, only have S&P 500 ranked (not by Market Cap) tickers data before 2020-05-08") # ['zr'] to match other error strings
+    success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_to_avoid, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
+    if success_or_error == "Error":
+        print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio, returning")
         return portfolio
-    if (back_testing and not paper_trading) or (not back_testing and (stop_day < datetime.now() - timedelta(hours=17.5))):
-        print("Error (backtesting and not paper trading) or back running")
-        return portfolio
-    if 'tickers_to_avoid' in params:
-        tickers_to_avoid = params['tickers_to_avoid']
-    else:
-        df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
-        tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
-    if back_testing:
-        tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else get_tickers_with_stock_splits_fmp(start_day=start_day)
-        count = 0 # since unresolved OSError: (50, 'ENETDOWN'/etc.), pause 60s every 30 days (most recently errored 2 months out)
-    usa_holidays = usa_cal.holidays(start=start_day.replace(month=1, day=1).strftime('%Y-%m-%d'), end=end_day.replace(month=12, day=31).strftime('%Y-%m-%d')).to_pydatetime() # usa instead of us to be consistent with folder name and to be consistent across country names
     while stop_day.date() <= end_day.date():
         if not (portfolio['open']['current_date'] >= stop_day).any(): # in case re-run existing portfolio over same days to avoid back running (and conserve time): avoid selling existing tickers incorrectly to TSL (too early) due to tsl_max_price set on future day or selling/buying existing/new tickers incorrectly with algorithm logic # assuming datetime is always in 13:00:00
             if back_testing:
@@ -1367,39 +1328,19 @@ import random
 def run_portfolio_random_sp500(portfolio, start_day=None, end_day=None, random_sp500_sell=True, paper_trading=True, back_testing=False, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 240, 'days': 15}, **params): # 04/24/2020 and 04/27/2020 doesn't have proper ranking, before 05/08/2020 only have S&P 500 Rank which is not Market Cap rank # maybe refactor rr_buy/sell to algo_buy/sell, especially if add more algorithms # , rr_buy=True
     print("running run_portfolio_random_sp500()")
     # UP_MOVE, DOWN_MOVE = portfolio['constants']['up_down_move'], -portfolio['constants']['up_down_move']
-    DAYS = portfolio['constants']['days']
-    # TAKE_PROFIT_PERCENTAGE = 1.0
-    # PRICE_UNCERTAINTY_PERCENTAGE = 0.05 # to reflect that can't always buy/sell at Yahoo Finance price and that stop loss and trailing stop loss orders can't always be fulfilled at the exact percentage
-    # SHORT = False # possibly add short logic
-    # get most exchange tickers listing
-    # exchange_prices = exchange_client.get_all_tickers()
-    end_day = end_day if end_day else datetime.now().replace(hour=13, minute=0, second=0, microsecond=0) # maybe refactor, markets are from 9:30 - 16:00 EST / 6:30 - 13:00 EST
-    start_day = start_day if start_day else end_day - timedelta(days=DAYS)
-    stop_day = start_day + timedelta(days=DAYS)
     df_tickers_sp500 = params['df_tickers_sp500'] if 'df_tickers_sp500' in params else _fetch_data(get_sp500_ranked_tickers_by_marketbeat, params={}, error_str=" - No S&P 500 tickers data from MarketBeat on: " + str(datetime.now()), empty_data = pd.DataFrame()) # assuming S&P 500 hasn't changed since start_day
     if df_tickers_sp500.empty: # df_tickers_sp500.empty - precautionary should never be empty # df_tickers_interval_start.empty or df_tickers_interval_stop.empty or  # df_tickers_interval_stop.empty
         print("Error no df_tickers_sp500 cannot perform algorithm")
         return portfolio
-    usa_holidays = usa_cal.holidays(start=start_day.replace(month=1, day=1).strftime('%Y-%m-%d'), end=end_day.replace(month=12, day=31).strftime('%Y-%m-%d')).to_pydatetime() # usa instead of us to be consistent with folder name and to be consistent across country names
+    success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_to_avoid, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
+    if success_or_error == "Error":
+        print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio, returning")
+        return portfolio
     # refactor repeat below,
     df_tickers_interval_stop = get_saved_tickers_data(date=stop_day.strftime('%Y-%m-%d'))
     while stop_day.weekday() > 4 or (stop_day.replace(hour=0, minute=0, second=0, microsecond=0) in usa_holidays) or df_tickers_interval_stop.empty: # maybe refactor - stop_day logic not initially set since don't mind scenario where in initial run running portfolio with open positions on a stop_day that is a weekend/holiday # stop_day = (stop_day + timedelta(days=1)) if (stop_day.weekday() < 4) else (stop_day + timedelta(days=7-stop_day.weekday()))
         stop_day = stop_day + timedelta(days=1)
         df_tickers_interval_stop = get_saved_tickers_data(date=stop_day.strftime('%Y-%m-%d'))
-    if start_day.date() < datetime.strptime('2020_05_08 13:00:00', '%Y_%m_%d %H:%M:%S').date():
-        print("Error saved S&P 500 tickers data with ['zr'] ordered alphabetically rather than by S&P 500 rank on 2020-04-24 and 2020-04-27, only have S&P 500 ranked (not by Market Cap) tickers data before 2020-05-08") # ['zr'] to match other error strings
-        return portfolio
-    if (back_testing and not paper_trading) or (not back_testing and (stop_day < datetime.now() - timedelta(hours=17.5))):
-        print("Error (backtesting and not paper trading) or back running")
-        return portfolio
-    if 'tickers_to_avoid' in params:
-        tickers_to_avoid = params['tickers_to_avoid']
-    else:
-        df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
-        tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
-    if back_testing:
-        tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else get_tickers_with_stock_splits_fmp(start_day=start_day)
-        count = 0 # since unresolved OSError: (50, 'ENETDOWN'/etc.), pause 60s every 30 days (most recently errored 2 months out)
     while stop_day.date() <= end_day.date():
         if not (portfolio['open']['current_date'] >= stop_day).any(): # in case re-run existing portfolio over same days to avoid back running (and conserve time): avoid selling existing tickers incorrectly to TSL (too early) due to tsl_max_price set on future day or selling/buying existing/new tickers incorrectly with algorithm logic # assuming datetime is always in 13:00:00
             if back_testing:
@@ -1456,30 +1397,10 @@ def run_portfolio_random_sp500(portfolio, start_day=None, end_day=None, random_s
 def run_portfolio_mm(portfolio, start_day=None, end_day=None, paper_trading=True, back_testing=False, top_interval_gainers=100, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 240, 'days': 15}, **params): # not implementing tilupccu_sell since don't want to set DOWN_MOVE as (~0, might buy some very undervalued tickers), could add tilupccu_sell that acts like tsl if pb >= 1
     print("running run_portfolio_mm()")
     # UP_MOVE = portfolio['constants']['up_down_move'] # , DOWN_MOVE , -portfolio['constants']['up_down_move']
-    DAYS = portfolio['constants']['days']
-    # TAKE_PROFIT_PERCENTAGE = 1.0
-    # PRICE_UNCERTAINTY_PERCENTAGE = 0.05 # to reflect that can't always buy/sell at Yahoo Finance price and that stop loss and trailing stop loss orders can't always be fulfilled at the exact percentage
-    # SHORT = False # possibly add short logic
-    # get most exchange tickers listing
-    # exchange_prices = exchange_client.get_all_tickers()
-    end_day = end_day if end_day else datetime.now().replace(hour=13, minute=0, second=0, microsecond=0) # maybe refactor, markets are from 9:30 - 16:00 EST / 6:30 - 13:00 EST
-    start_day = start_day if start_day else end_day - timedelta(days=DAYS)
-    stop_day = start_day + timedelta(days=DAYS)
-    if start_day.date() < datetime.strptime('2020_07_21 13:00:00', '%Y_%m_%d %H:%M:%S').date():
-        print("Error no Yahoo Finance industry column for data before 2020-07-21") # ['zr'] to match other error strings
+    success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_to_avoid, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
+    if success_or_error == "Error":
+        print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio, returning")
         return portfolio
-    if (back_testing and not paper_trading) or (not back_testing and (stop_day < datetime.now() - timedelta(hours=17.5))): # maybe refactor - time delay between when todays_data minute value and datetime.now() minute value can cause this to trigger when it maybe shouldn't
-        print("Error (backtesting and not paper trading) or back running")
-        return portfolio
-    if 'tickers_to_avoid' in params:
-        tickers_to_avoid = params['tickers_to_avoid']
-    else:
-        df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
-        tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
-    if back_testing:
-        tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else get_tickers_with_stock_splits_fmp(start_day=start_day)
-        count = 0 # since unresolved OSError: (50, 'ENETDOWN'/etc.), pause 60s every 30 days (most recently errored 2 months out)
-    usa_holidays = usa_cal.holidays(start=start_day.replace(month=1, day=1).strftime('%Y-%m-%d'), end=end_day.replace(month=12, day=31).strftime('%Y-%m-%d')).to_pydatetime() # usa instead of us to be consistent with folder name and to be consistent across country names
     while stop_day.date() <= end_day.date():
         if not (portfolio['open']['current_date'] >= stop_day).any(): # in case re-run existing portfolio over same days to avoid back running (and conserve time): avoid selling existing tickers incorrectly to TSL (too early) due to tsl_max_price set on future day or selling/buying existing/new tickers incorrectly with algorithm logic # assuming datetime is always in 13:00:00
             if back_testing:
@@ -1516,37 +1437,20 @@ def run_portfolio_mm(portfolio, start_day=None, end_day=None, paper_trading=True
             stop_day = stop_day + timedelta(days=1)
     return portfolio
 
-def run_portfolio_ai_recommendations_in_sector(portfolio, start_day=None, end_day=None, airs_sell=True, paper_trading=True, back_testing=False, limit_companies=33, back_running_allowance=11, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 180, 'tickers': 50, 'days': 1000}, **params): # keep **params here and in run_portfolio_rr() so can pass variables for backtesting cases in which the yahoo finance service is down but the data for start_day and end_day is already loaded
+def run_portfolio_ai_recommendations_in_sector(portfolio, start_day=None, end_day=None, airs_sell=True, paper_trading=True, back_testing=False, limit_companies=33, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 180, 'tickers': 50, 'days': 1000}, **params): # keep **params here and in run_portfolio_rr() so can pass variables for backtesting cases in which the yahoo finance service is down but the data for start_day and end_day is already loaded
     print("running run_portfolio_ai_recommendations_in_sector()")
-    if (not type(portfolio['constants']['up_down_move']) is list) or len(portfolio['constants']['up_down_move']) != 2:
-        print("Error up/down move constant not a list or a list not == 2")
+    if (not type(portfolio['constants']['up_down_move']) is list) or len(portfolio['constants']['up_down_move']) != 3:
+        print("Error up/down move constant is not a list or a list with length 3")
         return portfolio
     UP_MOVE, DOWN_MOVE, SECTOR = portfolio['constants']['up_down_move'] # maybe refactor and add similar to up_down_move with difference between start day's zacks rank and stop day's zacks rank,
-    DAYS = portfolio['constants']['days']
-    # TAKE_PROFIT_PERCENTAGE = 1.0
-    # PRICE_UNCERTAINTY_PERCENTAGE = 0.05 # to reflect that can't always buy/sell at Yahoo Finance price and that stop loss and trailing stop loss orders can't always be fulfilled at the exact percentage
-    # SHORT = False # possibly add short logic
-    # get most exchange tickers listing
-    # exchange_prices = exchange_client.get_all_tickers()
-    end_day = end_day if end_day else datetime.now().replace(hour=13, minute=0, second=0, microsecond=0) # maybe refactor, markets are from 9:30 - 16:00 EST / 6:30 - 13:00 EST # maybe refactor - add precautionary check here and below to see if datetime.now() is after 13h
-    start_day = start_day if start_day else end_day - timedelta(days=DAYS)
-    stop_day = start_day + timedelta(days=DAYS)
-    # if start_day.date() < datetime.strptime('2020_05_08 13:00:00', '%Y_%m_%d %H:%M:%S').date(): #
-    #     print("Error no saved TradingView Ratings before 2020-05-08")
-    #     return portfolio
-    if back_testing or (back_testing and not paper_trading) or (not back_testing and (stop_day < datetime.now() - timedelta(hours=back_running_allowance))): # back_running allowance# (stop_day.date() != datetime.now().date()) # maybe refactor here and below, allow 24 hours or more custom (especially if run update_portfolio_buy_and_sell_tickers() more than once per day after market hours as it is now or if account for running on weekends) # could also be more like in crypto.py or add full datetime comparison # here and below no need to check for (end_day.date() <= start_day.date()) since while loop won't execute (since stop_day is always > start_day will be greater than end_day)
-        print("Error backtesting (no historical stock news enabled) or (backtesting and not paper trading) or back running")
+    if ((not type(UP_MOVE) is int) or not (1 <= UP_MOVE <= 9)) or ((not type(DOWN_MOVE) is int) or not (1 <= DOWN_MOVE <= 9)) or (not type(SECTOR) is str): # [0]is higher rank threshold [1] is lower rank threshold [2] is sector can add check for sectors = list(df_tickers_interval_stop.Sector.unique()) but there is '' and None sectors so not checking
+        print("Error up/down move constants[0,1] are not int or up/down[0,1] are not within 1-9 inclusive or up/down[2] is not a string")
         return portfolio
-    if 'tickers_to_avoid' in params:
-        tickers_to_avoid = params['tickers_to_avoid']
-    else:
-        df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
-        tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
-    if back_testing:
-        tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else get_tickers_with_stock_splits_fmp(start_day=start_day) # since difference between daily (updated) and hourly (not updated) yahoo finance data for stocks that split after start day - this line in update_portfolio_postions_back_testing(): stop_day.date() < tickers_with_stock_splits[ticker]['ex_date'].date() should take care of issue
-        count = 0 # since unresolved OSError: (50, 'ENETDOWN'/etc.), pause 60s every 30 days (most recently errored 2 months out)
+    success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_to_avoid, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
+    if success_or_error == "Error":
+        print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio, returning")
+        return portfolio
     ticker_count = 0
-    usa_holidays = usa_cal.holidays(start=start_day.replace(month=1, day=1).strftime('%Y-%m-%d'), end=end_day.replace(month=12, day=31).strftime('%Y-%m-%d')).to_pydatetime() # usa_holidays = holidays.UnitedStates() # usa instead of us to be consistent with folder name and to be consistent across country names # only USA holidays for now since only working with tickers listed on USA exchanges
     while stop_day.date() <= end_day.date():
         if not (portfolio['open']['current_date'] >= stop_day).any(): # in case re-run existing portfolio over same days to avoid back running (and conserve time): avoid selling existing tickers incorrectly to TSL (too early) due to tsl_max_price set on future day or selling/buying existing/new tickers incorrectly with algorithm logic # assuming datetime is always in 13:00:00
             if back_testing:
@@ -1594,33 +1498,16 @@ def run_portfolio_ai_recommendations_in_sector(portfolio, start_day=None, end_da
 def run_portfolio_top_n_gainers_ai_analysis(portfolio, start_day=None, end_day=None, tngaia_sell=True, paper_trading=True, back_testing=False, back_running_allowance=11, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 180, 'tickers': 50, 'days': 1000}, **params): # keep **params here and in run_portfolio_rr() so can pass variables for backtesting cases in which the yahoo finance service is down but the data for start_day and end_day is already loaded
     print("running run_portfolio_top_n_gainers_ai_analysis()")
     if (not type(portfolio['constants']['up_down_move']) is list) or len(portfolio['constants']['up_down_move']) != 2:
-        print("Error up/down move constant not a list or a list not == 2")
+        print("Error up/down move constant is not a list or a list with length 2")
         return portfolio
     UP_MOVE, DOWN_MOVE = portfolio['constants']['up_down_move'] # maybe refactor and add similar to up_down_move with difference between start day's zacks rank and stop day's zacks rank,
-    DAYS = portfolio['constants']['days']
-    # TAKE_PROFIT_PERCENTAGE = 1.0
-    # PRICE_UNCERTAINTY_PERCENTAGE = 0.05 # to reflect that can't always buy/sell at Yahoo Finance price and that stop loss and trailing stop loss orders can't always be fulfilled at the exact percentage
-    # SHORT = False # possibly add short logic
-    # get most exchange tickers listing
-    # exchange_prices = exchange_client.get_all_tickers()
-    end_day = end_day if end_day else datetime.now().replace(hour=13, minute=0, second=0, microsecond=0) # maybe refactor, markets are from 9:30 - 16:00 EST / 6:30 - 13:00 EST # maybe refactor - add precautionary check here and below to see if datetime.now() is after 13h
-    start_day = start_day if start_day else end_day - timedelta(days=DAYS)
-    stop_day = start_day + timedelta(days=DAYS)
-    # if start_day.date() < datetime.strptime('2020_05_08 13:00:00', '%Y_%m_%d %H:%M:%S').date(): #
-    #     print("Error no saved TradingView Ratings before 2020-05-08")
-    #     return portfolio
-    if back_testing or (back_testing and not paper_trading) or (not back_testing and (stop_day < datetime.now() - timedelta(hours=back_running_allowance))): # back_running allowance# (stop_day.date() != datetime.now().date()) # maybe refactor here and below, allow 24 hours or more custom (especially if run update_portfolio_buy_and_sell_tickers() more than once per day after market hours as it is now or if account for running on weekends) # could also be more like in crypto.py or add full datetime comparison # here and below no need to check for (end_day.date() <= start_day.date()) since while loop won't execute (since stop_day is always > start_day will be greater than end_day)
-        print("Error backtesting (no historical stock news enabled) or (backtesting and not paper trading) or back running")
+    if ((not type(UP_MOVE) is int) or not (1 <= UP_MOVE <= 9)) or ((not type(DOWN_MOVE) is int) or not (1 <= DOWN_MOVE <= 9)): # [0]is higher rank threshold [1] is lower rank threshold
+        print("Error up/down move constants[0,1] are not an int or up/down[0,1] are not within 1-9 inclusive")
         return portfolio
-    if 'tickers_to_avoid' in params:
-        tickers_to_avoid = params['tickers_to_avoid']
-    else:
-        df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
-        tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
-    if back_testing:
-        tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else get_tickers_with_stock_splits_fmp(start_day=start_day) # since difference between daily (updated) and hourly (not updated) yahoo finance data for stocks that split after start day - this line in update_portfolio_postions_back_testing(): stop_day.date() < tickers_with_stock_splits[ticker]['ex_date'].date() should take care of issue
-        count = 0 # since unresolved OSError: (50, 'ENETDOWN'/etc.), pause 60s every 30 days (most recently errored 2 months out)
-    usa_holidays = usa_cal.holidays(start=start_day.replace(month=1, day=1).strftime('%Y-%m-%d'), end=end_day.replace(month=12, day=31).strftime('%Y-%m-%d')).to_pydatetime() # usa_holidays = holidays.UnitedStates() # usa instead of us to be consistent with folder name and to be consistent across country names # only USA holidays for now since only working with tickers listed on USA exchanges
+    success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_to_avoid, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
+    if success_or_error == "Error":
+        print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio, returning")
+        return portfolio
     while stop_day.date() <= end_day.date():
         if not (portfolio['open']['current_date'] >= stop_day).any(): # in case re-run existing portfolio over same days to avoid back running (and conserve time): avoid selling existing tickers incorrectly to TSL (too early) due to tsl_max_price set on future day or selling/buying existing/new tickers incorrectly with algorithm logic # assuming datetime is always in 13:00:00
             if back_testing:
@@ -1684,31 +1571,10 @@ def senate_timestamps_and_tickers_inflows_and_outflows_by_month_for_stocks(stock
 
 def run_portfolio_senate_trading(portfolio, start_day=None, end_day=None, senate_trading_sell=True, paper_trading=True, back_testing=False, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 240, 'days': 15}, **params): # maybe refactor and add sp500 and month to name
     print("running run_portfolio_senate_trading()")
+    if (not type(portfolio['constants']['up_down_move']) is int) or not (1 <= portfolio['constants']['up_down_move'] <= 5): # [0]is higher rank threshold [1] is lower rank threshold
+        print("Error up/down move constant is not an int or not within 1-5 inclusive")
+        return portfolio
     RANK_LIMIT = portfolio['constants']['up_down_move']
-    DAYS = portfolio['constants']['days']
-    # TAKE_PROFIT_PERCENTAGE = 1.0
-    # PRICE_UNCERTAINTY_PERCENTAGE = 0.05 # to reflect that can't always buy/sell at Yahoo Finance price and that stop loss and trailing stop loss orders can't always be fulfilled at the exact percentage
-    # SHORT = False # possibly add short logic
-    # get most exchange tickers listing
-    # exchange_prices = exchange_client.get_all_tickers()
-    end_day = end_day if end_day else datetime.now().replace(hour=13, minute=0, second=0, microsecond=0) # maybe refactor, markets are from 9:30 - 16:00 EST / 6:30 - 13:00 EST
-    start_day = start_day if start_day else end_day - timedelta(days=DAYS)
-    stop_day = start_day + timedelta(days=DAYS)
-    # refactor repeat below,
-    if start_day.date() < datetime.strptime('2020_05_08 13:00:00', '%Y_%m_%d %H:%M:%S').date():
-        print("Error saved S&P 500 tickers data with ['zr'] ordered alphabetically rather than by S&P 500 rank on 2020-04-24 and 2020-04-27, only have S&P 500 ranked (not by Market Cap) tickers data before 2020-05-08") # ['zr'] to match other error strings
-        return portfolio
-    if (back_testing and not paper_trading) or (not back_testing and (stop_day < datetime.now() - timedelta(hours=17.5))):
-        print("Error (backtesting and not paper trading) or back running")
-        return portfolio
-    if 'tickers_to_avoid' in params:
-        tickers_to_avoid = params['tickers_to_avoid']
-    else:
-        df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
-        tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
-    if back_testing:
-        tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else get_tickers_with_stock_splits_fmp(start_day=start_day)
-        count = 0 # since unresolved OSError: (50, 'ENETDOWN'/etc.), pause 60s every 30 days (most recently errored 2 months out)
     if 'senate_timestamps_and_tickers_inflows_and_outflows' in params:
         senate_timestamps_and_tickers_inflows_and_outflows = params['senate_timestamps_and_tickers_inflows_and_outflows']
     else:
@@ -1717,6 +1583,10 @@ def run_portfolio_senate_trading(portfolio, start_day=None, end_day=None, senate
         if df_tickers_sp500.empty or senate_timestamps_and_tickers_inflows_and_outflows.empty: # df_tickers_sp500.empty - precautionary should never be empty # df_tickers_interval_start.empty or df_tickers_interval_stop.empty or  # df_tickers_interval_stop.empty
             print("Error no df_tickers_sp500 or senate_timestamps_and_tickers_inflows_and_outflows cannot perform algorithm")
             return portfolio
+    success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_to_avoid, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
+    if success_or_error == "Error":
+        print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio, returning")
+        return portfolio
     tickers_to_buy_or_sell_every_month = {}
     for timestamp_and_ticker in senate_timestamps_and_tickers_inflows_and_outflows[senate_timestamps_and_tickers_inflows_and_outflows['rank'] < RANK_LIMIT].index:
         amount_fixed = senate_timestamps_and_tickers_inflows_and_outflows.loc[timestamp_and_ticker, 'amount_fixed']
@@ -1726,7 +1596,6 @@ def run_portfolio_senate_trading(portfolio, start_day=None, end_day=None, senate
             tickers_to_buy_or_sell_every_month[timestamp.strftime('%Y-%m-%d')].append([ticker, amount_fixed])
         else:
             tickers_to_buy_or_sell_every_month[timestamp.strftime('%Y-%m-%d')] = [[ticker, amount_fixed]]
-    usa_holidays = usa_cal.holidays(start=start_day.replace(month=1, day=1).strftime('%Y-%m-%d'), end=end_day.replace(month=12, day=31).strftime('%Y-%m-%d')).to_pydatetime() # usa instead of us to be consistent with folder name and to be consistent across country names
     while stop_day.date() <= end_day.date():
         if not (portfolio['open']['current_date'] >= stop_day).any(): # in case re-run existing portfolio over same days to avoid back running (and conserve time): avoid selling existing tickers incorrectly to TSL (too early) due to tsl_max_price set on future day or selling/buying existing/new tickers incorrectly with algorithm logic # assuming datetime is always in 13:00:00
             if back_testing:
@@ -1758,16 +1627,14 @@ def run_portfolio_senate_trading(portfolio, start_day=None, end_day=None, senate
 def run_portfolio_sma_mm(portfolio, start_day=None, end_day=None, sma_mm_sell=True, paper_trading=True, limit_companies=1000, **params): # run during market hours
     print("running run_portfolio_sma_mm()")
     # no need for, always trading: sma_mm_sell or (portfolio['balance']['usd'] >= portfolio['constants']['usd_invest_min'])
-    DAYS = 1 # maybe refactor - portfolio['constants']['days']
     UP_DOWN_MOVE = portfolio['constants']['up_down_move'] # refactor and add UP_MOVE, DOWN_MOVE = portfolio['constants']['up_down_move'] in terms of 20D, 50D, 200D ie 200 or [50,200] if multiple
-    end_day = end_day if end_day else datetime.now() # maybe refactor, markets are from 9:30 - 16:00 EST / 6:30 - 13:00 EST
-    start_day = start_day if start_day else end_day - timedelta(days=DAYS)
-    stop_day = datetime.now() # start_day + timedelta(days=DAYS)
-    if 'tickers_to_avoid' in params:
-        tickers_to_avoid = params['tickers_to_avoid']
-    else:
-        df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
-        tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
+    if UP_DOWN_MOVE not in ["price-200D", "price-200D-sp500", "5D-8D-13D"]:
+        print("Error up/down move constant is not in list of allowed algorithms: " + "price-200D, price-200D-sp500, 5D-8D-13D")
+        return portfolio
+    success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_to_avoid, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
+    if success_or_error == "Error":
+        print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio, returning")
+        return portfolio
     if stop_day.hour > 18: # assuming only called / running on market days / weekdays
         tickers_to_sell = []
         for ticker in portfolio['open'].index:
@@ -1791,7 +1658,6 @@ def run_portfolio_sma_mm(portfolio, start_day=None, end_day=None, sma_mm_sell=Tr
         if tickers_to_sell:
             portfolio = update_portfolio_buy_and_sell_tickers(portfolio=portfolio, tickers_to_buy=[], tickers_to_sell=tickers_to_sell, tickers_to_avoid=tickers_to_avoid, stop_day=stop_day, paper_trading=paper_trading, back_testing=False)
         return portfolio
-    usa_holidays = usa_cal.holidays(start=stop_day.replace(month=1, day=1).strftime('%Y-%m-%d'), end=stop_day.replace(month=12, day=31).strftime('%Y-%m-%d')).to_pydatetime()
     # add logic for UP_MOVE, DOWN_MOVE = portfolio['constants']['up_down_move']
     # if sma_mm_sell or (portfolio['balance']['usd'] >= portfolio['constants']['usd_invest_min']):
     interval_stop_date = stop_day - timedelta(days=DAYS)
