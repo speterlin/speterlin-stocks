@@ -1072,13 +1072,13 @@ from pandas.tseries.holiday import USFederalHolidayCalendar # import holidays - 
 usa_cal = USFederalHolidayCalendar()
 
 def check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, back_running_allowance=17.5, **params):
-    if (back_testing and not paper_trading) or (not back_testing and (stop_day < datetime.now() - timedelta(hours=back_running_allowance))): # back_running_allowance=11 for airs for some reason # 6:30am (new data arrives - except weekends & holidays) - 01:00pm previous day = 17.5 # assuming datetime input is always in 13:00:00 and run after market close of the stop_day # (stop_day.date() != datetime.now().date()) # maybe refactor here and below, allow 24 hours or more custom (especially if run update_portfolio_buy_and_sell_tickers() more than once per day after market hours as it is now or if account for running on weekends) # could also be more like in crypto.py or add full datetime comparison # here and below no need to check for (end_day.date() <= start_day.date()) since while loop won't execute (since stop_day is always > start_day will be greater than end_day)
-        print("Error (backtesting and not paper trading) or back running")
-        return ["Error", portfolio, None, None, None, None, None, None, None, None]
     days = portfolio['constants']['days']
     end_day = end_day if end_day else datetime.now().replace(hour=13, minute=0, second=0, microsecond=0) # maybe refactor, markets are from 9:30 - 16:00 EST / 6:30 - 13:00 PST # maybe refactor - add precautionary check here and below to see if datetime.now() is after 13h
     start_day = start_day if start_day else end_day - timedelta(days=days)
     stop_day = start_day + timedelta(days=days)
+    if (back_testing and not paper_trading) or (not back_testing and (stop_day < datetime.now() - timedelta(hours=back_running_allowance))): # back_running_allowance=11 for airs for some reason # 6:30am (new data arrives - except weekends & holidays) - 01:00pm previous day = 17.5 # assuming datetime input is always in 13:00:00 and run after market close of the stop_day # (stop_day.date() != datetime.now().date()) # maybe refactor here and below, allow 24 hours or more custom (especially if run update_portfolio_buy_and_sell_tickers() more than once per day after market hours as it is now or if account for running on weekends) # could also be more like in crypto.py or add full datetime comparison # here and below no need to check for (end_day.date() <= start_day.date()) since while loop won't execute (since stop_day is always > start_day will be greater than end_day)
+        print("Error (backtesting and not paper trading) or back running")
+        return ["Error", portfolio, None, None, None, None, None, None, None, None]
     if start_day.date() < datetime.strptime('2020_05_08 13:00:00', '%Y_%m_%d %H:%M:%S').date():
         print("Error saved S&P 500 tickers data with ['zr'] ordered alphabetically rather than by S&P 500 rank on 2020-04-24 and 2020-04-27, only have S&P 500 ranked (not by Market Cap) tickers data before 2020-05-08") # ['zr'] to match other error strings # "Error no saved TradingView Ratings before 2020-05-08"
         return ["Error", portfolio, None, None, None, None, None, None, None, None]
