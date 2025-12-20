@@ -50,7 +50,8 @@ __all__ = [
     "get_tickers_to_avoid_in_alpaca",
     "get_tickers_to_avoid",
     "update_portfolio_buy_and_sell_tickers",
-    "get_sp500_ranked_tickers_by_marketbeat",
+    "get_sp500_ranked_tickers_by_slickcharts",
+    # "get_sp500_ranked_tickers_by_marketbeat",
     "run_portfolio",
     "check_for_basic_errors_and_set_general_params_for_run_portfolio",
     "run_portfolio_zr",
@@ -371,8 +372,8 @@ def get_tickers_with_stock_splits_in_day_yfinance(date, tickers_for_period): # d
     resp = requests.get(site_url, headers=headers) #  # if random_int % 2 != 0 else requests.get(site_url, headers=headers[1])
     soup = bs.BeautifulSoup(resp.text, 'html.parser')
     table = soup.find('table', {'class': 'W(100%)'})
-    for row in table.findAll('tr')[1:]:
-        tds = row.findAll('td')
+    for row in table.find_all('tr')[1:]:
+        tds = row.find_all('td')
         ticker = tds[0].text.strip()
         split_ratio_text = tds[4].text.strip() if (tds[4].text.strip() and tds[4].text.strip() != '-') else "1.00 - 1.00"
         try:
@@ -422,7 +423,7 @@ def get_ticker_data_detailed_gfinance(ticker, exchange):
     resp = requests.get(site_url, headers=headers) # , auth=(username, password)) # maybe add timeout=50 to avoid unsolved_error (see requests documentation)
     soup = bs.BeautifulSoup(resp.text, 'html.parser')
     last = float(soup.find('div', {'class': 'AHmHk'}).text.strip().replace('$',"").replace(',',""))
-    divs = soup.findAll('div', {'class': 'gyFHrc'}) # divs = soup.find('div', {'class': 'eYanAe'}).findAll('div')
+    divs = soup.find_all('div', {'class': 'gyFHrc'}) # divs = soup.find('div', {'class': 'eYanAe'}).find_all('div')
     data, times_table = {'Last': last}, {'T': 1e12, 'B': 1e9, 'M': 1e6, 'K': 1e3}
     exchange_rates_usd = _fetch_data(get_exchange_rates_exchangerate, params={'base_currency': 'USD'}, error_str=" - No Exchange Rates (USD) from ExchangeRate-api on: " + str(datetime.now()), empty_data = {})
     for div in divs:
@@ -1031,18 +1032,33 @@ def update_portfolio_buy_and_sell_tickers(portfolio, tickers_to_buy, tickers_to_
                 portfolio['open'].loc[ticker, ['position', 'balance', 'buy_date', 'buy_price', 'current_date', 'current_price', 'current_roi', 'fmp_24h_vol', 'gtrends_15d', 'rank_rise_d', 'tsl_armed', 'trade_notes']] = [('long' if not paper_trading else 'long-p'), quantity] + [buy_date, price]*2 + [0, fmp_24h_vol, google_trends_slope, rank_rise_d, False, trade_notes] # assuming buying at ~20 PST which means order gets executed at start of day next day every day # maybe refactor 'long-p' - alpaca
     return portfolio
 
+def get_sp500_ranked_tickers_by_slickcharts() :
+    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10 7 4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'}
+    resp = requests.get('https://www.slickcharts.com/sp500', headers=headers, verify=False)
+    soup = bs.BeautifulSoup(resp.text, 'lxml')
+    table = soup.find('table', {'class': 'table table-hover table-borderless table-sm'})
+    df_tickers = pd.DataFrame(columns = ["Company Name", "S&P 500 Rank", "Weight", "Price", "Price Change"]).astype({'Company Name': 'object','S&P 500 Rank': 'float64', 'Weight': 'float64', 'Price': 'float64', 'Price Change': 'float64'})
+    for idx,row in enumerate(table.find_all('tr')[1:]):
+        tds = row.find_all('td')
+        sp500_rank = float(tds[0].text.strip())
+        company_name, ticker = tds[1].text.strip(), tds[2].text.strip()
+        weight, price, price_change = float(tds[3].text.strip().replace('%',''))/100, float(tds[4].text.strip().replace(',','')), float(tds[6].text.strip().replace('%','').replace('(','').replace(')',''))/100
+        df_tickers.loc[ticker, ["Company Name", "S&P 500 Rank", "Weight", "Price", "Price Change"]] = [company_name, sp500_rank, weight, price, price_change]
+    return df_tickers
+
+# not working atm
 def get_sp500_ranked_tickers_by_marketbeat():
     resp = requests.get('https://www.marketbeat.com/types-of-stock/sp-500-stocks/') # , verify=False # ISSUE - site doesn't update data daily it's a 1 day lag, 'http://en.wikipedia.org/wiki/List_of_S%26P_500_companies
     soup = bs.BeautifulSoup(resp.text, 'lxml') # 'html.parser'
     table = soup.find('table', {'class': 'scroll-table sort-table'}) # 'wikitable sortable'
     df_tickers = pd.DataFrame(columns = ["Company Name", "S&P 500 Rank", "Price", "Price Change"]).astype({'Company Name': 'object','S&P 500 Rank': 'float64', 'Price': 'float64', 'Price Change': 'float64'}) # think since assigning multiple values at once below
-    for idx,row in enumerate(table.findAll('tr')[1:]):
-        tds = row.findAll('td')
-        sp_rank = idx + 1 # since start at 1:
+    for idx,row in enumerate(table.find_all('tr')[1:]):
+        tds = row.find_all('td')
+        sp500_rank = idx + 1 # since start at 1:
         ticker, company_name = [ticker_or_company_name.strip() for ticker_or_company_name in tds[0]['data-clean'].split('|')]
         price, price_change = [float(re.sub(r"[^\d\.\-]", "", price_or_price_change)) for price_or_price_change in tds[1]['data-clean'].split('|')]
         price_change = price_change / 100
-        df_tickers.loc[ticker, ['Company Name', 'S&P 500 Rank', 'Price', 'Price Change']] = [company_name, sp_rank, price, price_change]
+        df_tickers.loc[ticker, ['Company Name', 'S&P 500 Rank', 'Price', 'Price Change']] = [company_name, sp500_rank, price, price_change]
     return df_tickers
 
 def run_portfolio(portfolio, **params): # call portfolio = run_portfolio(portfolio, **params) for all functions below, if pass paper_trading=True in run_portfolio() params should pick it up and treat as a normal parameter in run_portfolio_rr etc # start_day=None, end_day=None, algo_sell=True, paper_trading=True, back_testing=False, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 240, 'days': 15}
@@ -1328,7 +1344,7 @@ import random
 def run_portfolio_random_sp500(portfolio, start_day=None, end_day=None, random_sp500_sell=True, paper_trading=True, back_testing=False, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 240, 'days': 15}, **params): # 04/24/2020 and 04/27/2020 doesn't have proper ranking, before 05/08/2020 only have S&P 500 Rank which is not Market Cap rank # maybe refactor rr_buy/sell to algo_buy/sell, especially if add more algorithms # , rr_buy=True
     print("running run_portfolio_random_sp500()")
     # UP_MOVE, DOWN_MOVE = portfolio['constants']['up_down_move'], -portfolio['constants']['up_down_move']
-    df_tickers_sp500 = params['df_tickers_sp500'] if 'df_tickers_sp500' in params else _fetch_data(get_sp500_ranked_tickers_by_marketbeat, params={}, error_str=" - No S&P 500 tickers data from MarketBeat on: " + str(datetime.now()), empty_data = pd.DataFrame()) # assuming S&P 500 hasn't changed since start_day
+    df_tickers_sp500 = params['df_tickers_sp500'] if 'df_tickers_sp500' in params else _fetch_data(get_sp500_ranked_tickers_by_slickcharts, params={}, error_str=" - No S&P 500 tickers data from Slickcharts on: " + str(datetime.now()), empty_data = pd.DataFrame()) # assuming S&P 500 hasn't changed since start_day
     if df_tickers_sp500.empty: # df_tickers_sp500.empty - precautionary should never be empty # df_tickers_interval_start.empty or df_tickers_interval_stop.empty or  # df_tickers_interval_stop.empty
         print("Error no df_tickers_sp500 cannot perform algorithm")
         return portfolio
@@ -1578,7 +1594,7 @@ def run_portfolio_senate_trading(portfolio, start_day=None, end_day=None, senate
     if 'senate_timestamps_and_tickers_inflows_and_outflows' in params:
         senate_timestamps_and_tickers_inflows_and_outflows = params['senate_timestamps_and_tickers_inflows_and_outflows']
     else:
-        df_tickers_sp500 = params['df_tickers_sp500'] if 'df_tickers_sp500' in params else _fetch_data(get_sp500_ranked_tickers_by_marketbeat, params={}, error_str=" - No S&P 500 tickers data from MarketBeat on: " + str(datetime.now()), empty_data = pd.DataFrame()) # assuming S&P 500 hasn't changed since start_day
+        df_tickers_sp500 = params['df_tickers_sp500'] if 'df_tickers_sp500' in params else _fetch_data(get_sp500_ranked_tickers_by_slickcharts, params={}, error_str=" - No S&P 500 tickers data from Slickcharts on: " + str(datetime.now()), empty_data = pd.DataFrame()) # assuming S&P 500 hasn't changed since start_day
         senate_timestamps_and_tickers_inflows_and_outflows = _fetch_data(senate_timestamps_and_tickers_inflows_and_outflows_by_month_for_stocks, params={'stocks_list': list(df_tickers_sp500.index)}, error_str=" - Issues with senate timestamps and tickers inflows and outflows by month data from FMP on: " + str(datetime.now()), empty_data = pd.DataFrame())
         if df_tickers_sp500.empty or senate_timestamps_and_tickers_inflows_and_outflows.empty: # df_tickers_sp500.empty - precautionary should never be empty # df_tickers_interval_start.empty or df_tickers_interval_stop.empty or  # df_tickers_interval_stop.empty
             print("Error no df_tickers_sp500 or senate_timestamps_and_tickers_inflows_and_outflows cannot perform algorithm")
@@ -1665,7 +1681,7 @@ def run_portfolio_sma_mm(portfolio, start_day=None, end_day=None, sma_mm_sell=Tr
         interval_stop_date = interval_stop_date - timedelta(days=1)
     df_tickers_interval_stop, df_tickers_sp500 = get_saved_tickers_data(date=interval_stop_date.strftime('%Y-%m-%d')), pd.DataFrame()
     if UP_DOWN_MOVE == "price-200D-sp500":
-        df_tickers_sp500 = params['df_tickers_sp500'] if 'df_tickers_sp500' in params else _fetch_data(get_sp500_ranked_tickers_by_marketbeat, params={}, error_str=" - No S&P 500 tickers data from MarketBeat on: " + str(datetime.now()), empty_data = pd.DataFrame()) # assuming S&P 500 hasn't changed since start_day
+        df_tickers_sp500 = params['df_tickers_sp500'] if 'df_tickers_sp500' in params else _fetch_data(get_sp500_ranked_tickers_by_slickcharts, params={}, error_str=" - No S&P 500 tickers data from Slickcharts on: " + str(datetime.now()), empty_data = pd.DataFrame()) # assuming S&P 500 hasn't changed since start_day
         if df_tickers_sp500.empty: # df_tickers_sp500.empty - precautionary should never be empty # df_tickers_interval_start.empty or df_tickers_interval_stop.empty or  # df_tickers_interval_stop.empty
             print("Error no df_tickers_sp500 cannot perform algorithm")
             return portfolio

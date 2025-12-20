@@ -1,6 +1,6 @@
 # speterlin-stocks
 
-A Python package for a suite of quant-trading opportunities in stocks with API integration: Alpaca brokerage for storing USD assets and margin trading (2x) on exchanges NYSE & NASDAQ, Financial Modeling Prep (FMP) & Google Trends & Yahoo Finance & Google Finance & ExchangeRate & MarketBeat & CrunchBase for data collection, OpenAI & Google Gemini-Pro for AI analysis.
+A Python package for a suite of quant-trading opportunities in stocks with API integration: Alpaca brokerage for storing USD assets and margin trading (2x) on exchanges NYSE & NASDAQ, Financial Modeling Prep (FMP) & Google Trends & Yahoo Finance & Google Finance & ExchangeRate & Slickcharts & CrunchBase for data collection, OpenAI & Google Gemini-Pro for AI analysis.
 
 Please see [quant-trading](https://github.com/speterlin/quant-trading) for writing scripts, backtesting, other analysis. Make sure to install package like this (with python>=3.12 and latest pip) in your environment or (recommended) virtual environment:
 ```python
@@ -76,7 +76,7 @@ df_tickers_2025_11_17 = stocks.get_saved_tickers_data(date='2025-11-17')
 df_tickers_2025_11_17.loc['GOOGL']
 ```
 
-## Get todays other (Google Trends & Yahoo Finance & Google Finance & ExchangeRate & MarketBeat & CrunchBase) data
+## Get todays other (Google Trends & Yahoo Finance & Google Finance & ExchangeRate & Slickcharts & CrunchBase) data
 
 ```python
 import pandas as pd
@@ -99,8 +99,8 @@ ticker_data_detailed = stocks._fetch_data(stocks.get_ticker_data_detailed_gfinan
 # ExchangeRate
 exchange_rates_usd = stocks._fetch_data(stocks.get_exchange_rates_exchangerate, params={'base_currency': 'USD'}, error_str=" - No Exchange Rates (USD) from ExchangeRate-api on: " + str(datetime.now()), empty_data = {})
 
-# MarketBeat
-df_tickers_sp500 = stocks._fetch_data(stocks.get_sp500_ranked_tickers_by_marketbeat, params={}, error_str=" - No s&p 500 tickers data from MarketBeat on: " + str(datetime.now()), empty_data = pd.DataFrame())
+# Slickcharts
+df_tickers_sp500 = stocks._fetch_data(stocks.get_sp500_ranked_tickers_by_slickcharts, params={}, error_str=" - No s&p 500 tickers data from Slickcharts on: " + str(datetime.now()), empty_data = pd.DataFrame())
 
 # CrunchBase downloading Tech Company data, bot detectors are quite good so currently blocked even with fake_headers and cookies
 from fake_headers import Headers
