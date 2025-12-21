@@ -1,3 +1,29 @@
+# Standard library imports (in order of appearance then import/from)
+import time
+import json
+import re
+import math
+import random
+import os
+from random import randint
+from collections import Counter
+from statistics import mean
+
+# Third Party imports (in order of appearance then import/from)
+import requests
+import numpy as np
+import pandas as pd
+import yfinance as yf
+import bs4 as bs
+from pandas.tseries.holiday import USFederalHolidayCalendar # import holidays - add back if works
+from datetime import datetime, timedelta
+from pytrends.request import TrendReq
+from fake_headers import Headers
+from unidecode import unidecode
+from pytz import timezone
+
+# Local Imports
+
 # global objects (API clients, config, globals)
 # alpaca_api = None
 # FMP_API_KEY = None
@@ -6,7 +32,6 @@
 # twilio_phone_to = None
 # twilio_phone_from = None
 # portfolio_account = None # maybe add portfolio_name later for more consistent logic
-
 # unused since not 'from .module1 import *' in __init__.py
 __all__ = [
     "_fetch_data",
@@ -76,9 +101,60 @@ __all__ = [
     "save_portfolio_backup",
     "get_saved_portfolio_backup",
 ]
-
-import requests
-import time
+openai_functions=[
+    {
+        "name": "get_company_stock_ticker",
+        "description": "This will get the USA stock ticker and the name of the company",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "ticker_symbol": {
+                    "type": "string",
+                    "description": "This is the stock symbol of the company.",
+                },
+                "company_name": {
+                    "type": "string",
+                    "description": "This is the name of the company given in query",
+                }
+            },
+            "required": ["ticker_symbol", "company_name",]
+        },
+    },
+    {
+        "name": "get_company_competitors_and_their_tickers",
+        "description": "This will get the names of the competitor companies of the company and their ticker symbols",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "company_names": {
+                    "type": "string",
+                    "description": "This is the names of the competitor companies of the company given in query",
+                },
+                "ticker_symbols": {
+                    "type": "string",
+                    "description": "This is the ticker symbols of the competitor companies of the company given in query",
+                }
+            },
+            "required": ["company_names","ticker_symbols"]
+        },
+    },
+    {
+        "name": "extract_investment_recommendation",
+        "description": "This will get the numeric investment recommendation on a scale of 1-10 for the OpenAI analysis of the company",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "investment_recommendation": {
+                    "type": "string",
+                    "description": "This is the numeric investment recommendation on a scale of 1-10 of the OpenAI analysis of the company given in query",
+                },
+            },
+            "required": ["investment_recommendation"]
+        },
+    }
+]
+usa_cal = USFederalHolidayCalendar()
+eastern = timezone('US/Eastern') # maybe refactor to mimick crypto.py which uses + timedelta(hours=7) instead of using timezone
 
 # ~same as in eventregistry/quant-trading/crypto.py # maybe refactor name to _fetch_or_push_data, pushing data is unique for when sending orders to exchange so probably not that important
 # need to have ndg-httpsclient, pyopenssl, and pyasn1 (latter 2 are normally already installed) installed to deal with Caused by SSLError(SSLError("bad handshake: SysCallError(60, 'ETIMEDOUT')",),) according to https://stackoverflow.com/questions/33410577 (should also check tls_version and maybe unset https_proxy from commandline), but doesn't seem to work (might also be because requests removed 3DES from default cipher suite list: github.com/psf/requests/issues/4193), but error is escaped when fetching zacks data (so far only issue is with yahoo finance - maybe because yahoo finance api has a 2,000 API calls per hour limit)
@@ -96,8 +172,6 @@ def _fetch_data(func, params, error_str, empty_data, retry=True):
             data = _fetch_data(func, params, error_str, empty_data, retry=False)
     return data
 
-import numpy as np
-
 # data is dataframe column series, same as in crypto.py
 def trendline(data, order=1, reverse_to_ascending=False):
     data_index_values = data.index.values[::-1] if reverse_to_ascending else data.index.values
@@ -112,10 +186,6 @@ def get_zacks_data(ticker=None):
     resp = requests.get("https://quote-feed.zacks.com/?t=" + ticker, headers=headers, verify=False) # proxies=proxies, #) # , verify=False # can add installing openssl: https://stackoverflow.com/questions/51768496/why-do-https-requests-produce-ssl-certificate-verify-failed-error, https://www.google.com/search?q=browser+request+vs.+python+requests.get&oq=browser+request+vs.+python+requests.get&aqs=chrome..69i57.8276j0j7&sourceid=chrome&ie=UTF-8
     data = resp.json()
     return data
-
-import pandas as pd
-import json
-from datetime import datetime, timedelta
 
 def get_ticker_data_quote_fmp(ticker):  # maybe refactor add real_time to name
     # global FMP_API_KEY
@@ -290,15 +360,10 @@ def get_senate_trading_symbol_fmp(ticker):
     df = df.set_index(['dateRecieved']).sort_index()
     return df
 
-import yfinance as yf
-
 # refactor to get rid of verbose
 def get_ticker_data_yf(ticker, start_datetime=None, end_datetime=None, interval="1d"):
     data = yf.download(ticker, start_datetime, end_datetime, interval=interval) # OHLC, adj close, volume
     return data
-
-import bs4 as bs
-import re
 
 def get_ticker_data_detailed_yfinance(ticker, options={'engaged': False, 'type': 'key-statistics'}, additional_page={'engaged': False, 'type': 'profile'}): # maybe refactor to incorporate multiple options # 'financials' # financial options doesn't include 'summaryProfile', 'defaultKeyStatistics', 'financialData'
     headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10 7 4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'} # {'User-Agent': 'Mozilla/4.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'} # maybe refactor here and below, might change header to something else but doesn't matter just tricking the server (fighting bots / crawlers) into thinking it's a browser making the request, header is from https://stackoverflow.com/questions/68259148/getting-404-error-for-certain-stocks-and-pages-on-yahoo-finance-python
@@ -457,59 +522,6 @@ def get_ticker_data_detailed_gfinance(ticker, exchange):
     data['EPS (TTM)'] = (1 / data['P/E ratio']) * last if 'P/E ratio' in data else float("NaN") # P/E is using TTM assuming it's basic earnings
     return data
 
-openai_functions=[
-    {
-        "name": "get_company_stock_ticker",
-        "description": "This will get the USA stock ticker of the company",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "ticker_symbol": {
-                    "type": "string",
-                    "description": "This is the stock symbol of the company.",
-                },
-                "company_name": {
-                    "type": "string",
-                    "description": "This is the name of the company given in query",
-                }
-            },
-            "required": ["company_name","ticker_symbol"]
-        },
-    },
-    {
-        "name": "get_company_competitors_and_their_tickers",
-        "description": "This will get the names of the competitor companies of the company and their ticker symbols",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "company_names": {
-                    "type": "string",
-                    "description": "This is the names of the competitor companies of the company given in query",
-                },
-                "ticker_symbols": {
-                    "type": "string",
-                    "description": "This is the ticker symbols of the competitor companies of the company given in query",
-                }
-            },
-            "required": ["company_names","ticker_symbols"]
-        },
-    },
-    {
-        "name": "extract_investment_recommendation",
-        "description": "This will get the numeric investment recommendation on a scale of 1-10 for the OpenAI analysis of the company",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "investment_recommendation": {
-                    "type": "string",
-                    "description": "This is the numeric investment recommendation on a scale of 1-10 of the OpenAI analysis of the company given in query",
-                },
-            },
-            "required": ["investment_recommendation"]
-        },
-    }
-]
-
 def should_I_buy_the_stock_openai (analysis): # extract_investment_recommendation_openai # , ai="google-gemini-pro"
     response = openai_client.chat.completions.create( # openai.ChatCompletion.create(
         model="gpt-4", # 3.5-turbo
@@ -588,8 +600,6 @@ def extract_investment_recommendation_2(analysis, ticker):
     # rating = float(re.findall(r"[0-9]{1,2}" + " out of 10", analysis.text)[0].split()[0]) if re.findall(r"[0-9]{1,2}" + " out of 10", analysis.text) else float("NaN")
     # rating = google_gemini_pro_model.generate_content(f"Given the Google Gemini Pro analysis, what is the numeric investment recommendation on a scale of 1-10 of the company stock ticker ?: {analysis.text}?")
     return rating
-
-from pytrends.request import TrendReq
 
 def get_google_trends_pt(kw_list, from_date, to_date, trend_days=270, cat=0, geo='', tz=480, gprop='', hl='en-US', isPartial_col=False, from_start=False, scale_cols=True): # trend_days max is around 270 # category to narrow results # geo e.g 'US', 'UK' # tz = timezone offset default is 360 which is US CST (UTC-6), PST is 480 (assuming UTC-8*60) # hl language default is en-US # gprop : filter results to specific google property like 'images', 'news', 'youtube' or 'froogle' # overlap=100, sleeptime=1, not doing multiple searches # other variables: timeout=(10,25), proxies=['https://34.203.233.13:80',], retries=2, backoff_factor=0.1, requests_args={'verify':False}
     data = pd.DataFrame()
@@ -740,9 +750,6 @@ def save_usa_alpaca_tickers_fmp_data(date): # maybe refactor and take away ms si
     save_tickers_yf_and_fmp_data(df_usa_alpaca_tickers_fmp_ms_zr_data, date)
     return df_usa_alpaca_tickers_fmp_ms_zr_data
 
-from unidecode import unidecode
-from fake_headers import Headers
-
 def get_crunchbase_search_permalinks(permalink, **params):
     # time.sleep(5) # since if return a long list (up to 25) will iterate over a long list will get json.decoder.JSONDecodeError: Expecting value: line 6 column 1 (char 5) error -> https://stackoverflow.com/questions/34579327/jsondecodeerror-expecting-value-line-1-column-1?rq=1
     permalinks = [] # maybe refactor and change this (declaring empty function return / half of what function returns at beginning of function) in this function and below crunchbase functions
@@ -782,8 +789,6 @@ def get_crunchbase_permalink_site_check_ticker(ticker, permalink, retry=True, **
         data = [None, resp.status_code]
     print(permalink + " ; " + str(data))
     return data
-
-from random import randint
 
 def get_crunchbase_data_for_ticker(ticker, permalink_original, **params): # company is lowercase string like 'asana' # old name - get_crunchbase_user_data_for_company_with_ticker() # apply same logic in save_usa_alpaca_tickers_fmp_data() function with its own counter (separate from yahoo finance counter) # maybe refactor and remove resp.status_code from return [data, resp.status_code]
     print("<<< " + ticker + " >>>")
@@ -827,8 +832,6 @@ def get_crunchbase_data_for_ticker(ticker, permalink_original, **params): # comp
             data["_".join(user_data_category.lower().split())] = data["_".join(user_data_category.lower().split())]/100
     # print(ticker + ": permalink: " + permalink + ", data: " + str(data)) # + ",\n headers: " + str(headers) + ", resp: " + str(resp)) #
     return [data, resp.status_code]
-
-import math
 
 # alpaca_exchanges = {'IEX (Investors Exchange LLC)', 'NYSE National, Inc.', 'Nasdaq BX, Inc.', 'Nasdaq PSX', 'NYSE Chicago, Inc.', 'AMEX'}
 def alpaca_trade_ticker(ticker, side, usd_invest=None, quantity=None, price=None, paper_trading=True, open_time=5, other_notes=None): # added open_time due to retrying paper order 'FGF' error 2022-12-13 "Partially filled" listed as "~Filled" - in past testing conditions 0 "~Filled" positions which means open_order gets processed immediately but retrying paper orders are filled during market hours different testing conditions # maybe refactor side logic as precautionary in case alpaca api changes from normal "buy" and "sell" # fetching price and calculating quantity in method since better to get price as close to executing alpaca_api.submit_order as possible even though when not back_testing using same price for data analysis and trading (Alpaca), unlike in crypto - CoinGecko (which is exchange volume-weighted) for data analysis and Binance for trading
@@ -888,9 +891,6 @@ def fmp_check_24h_vol(ticker, fmp_24h_vol, datetime, fmp_24h_vol_min=5000, paper
         print("\033[95m" + message_body + "\033[0m") # maybe refactor, repeated below but this way allows for customization and less logic at the end since both situations can occur together
         twilio_message = _fetch_data(twilio_client.messages.create, params={'to': twilio_phone_to, 'from_': twilio_phone_from, 'body': message_body}, error_str=" - Twilio msg error to: " + twilio_phone_to + " on: " + str(datetime.now()), empty_data=None) if not paper_trading else None
     return fmp_24h_vol_too_low
-
-# from pytz import timezone
-# pacific = timezone('US/Pacific')
 
 def update_portfolio_postions_back_testing(portfolio, stop_day, end_day, **params): # maybe refactor name to update_portfolio_open_postions_back_testing, maybe integrate with portfolio_trading section so only have one function for both functions
     STOP_LOSS = portfolio['constants']['sl']
@@ -1084,9 +1084,6 @@ def run_portfolio(portfolio, **params): # call portfolio = run_portfolio(portfol
         portfolio = run_portfolio_sma_mm(portfolio, **params)
     return portfolio
 
-from pandas.tseries.holiday import USFederalHolidayCalendar # import holidays - add back if works
-usa_cal = USFederalHolidayCalendar()
-
 def check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, back_running_allowance=17.5, **params):
     days = portfolio['constants']['days']
     end_day = end_day if end_day else datetime.now().replace(hour=13, minute=0, second=0, microsecond=0) # maybe refactor, markets are from 9:30 - 16:00 EST / 6:30 - 13:00 PST # maybe refactor - add precautionary check here and below to see if datetime.now() is after 13h
@@ -1214,8 +1211,6 @@ def run_portfolio_rr(portfolio, start_day=None, end_day=None, rr_sell=True, pape
             stop_day = stop_day + timedelta(days=1)
     return portfolio
 
-from collections import Counter
-
 def run_portfolio_tilupccu(portfolio, start_day=None, end_day=None, paper_trading=True, back_testing=False, top_interval_losers=100, custom_order=True, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 240, 'days': 15}, **params): # not implementing tilupccu_sell since don't want to set DOWN_MOVE as (~0, might buy some very undervalued tickers), could add tilupccu_sell that acts like tsl if pb >= 1
     print("running run_portfolio_tilupccu()")
     if (not type(portfolio['constants']['up_down_move']) is list) or len(portfolio['constants']['up_down_move']) != 2:
@@ -1281,8 +1276,6 @@ def run_portfolio_tilupccu(portfolio, start_day=None, end_day=None, paper_tradin
             stop_day = stop_day + timedelta(days=1)
     return portfolio
 
-from statistics import mean
-
 def run_portfolio_mmtv(portfolio, start_day=None, end_day=None, mmtv_sell=True, paper_trading=True, back_testing=False, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 240, 'days': 15}, **params): # 04/24/2020 and 04/27/2020 doesn't have proper ranking, before 05/08/2020 only have S&P 500 Rank which is not Market Cap rank # maybe refactor rr_buy/sell to algo_buy/sell, especially if add more algorithms # , rr_buy=True
     print("running run_portfolio_mmtv()")
     # UP_MOVE, DOWN_MOVE = portfolio['constants']['up_down_move'], -portfolio['constants']['up_down_move']
@@ -1337,8 +1330,6 @@ def run_portfolio_mmtv(portfolio, start_day=None, end_day=None, mmtv_sell=True, 
         while stop_day.weekday() > 4 or (stop_day.replace(hour=0, minute=0, second=0, microsecond=0) in usa_holidays): # maybe refactor - stop_day logic not initially set since don't mind scenario where in initial run running portfolio with open positions on a stop_day that is a weekend/holiday # stop_day = (stop_day + timedelta(days=1)) if (stop_day.weekday() < 4) else (stop_day + timedelta(days=7-stop_day.weekday()))
             stop_day = stop_day + timedelta(days=1)
     return portfolio
-
-import random
 
 # meant for sell and then buy random weighted positions every 30 days (month) without any SL & TSL etc
 def run_portfolio_random_sp500(portfolio, start_day=None, end_day=None, random_sp500_sell=True, paper_trading=True, back_testing=False, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 240, 'days': 15}, **params): # 04/24/2020 and 04/27/2020 doesn't have proper ranking, before 05/08/2020 only have S&P 500 Rank which is not Market Cap rank # maybe refactor rr_buy/sell to algo_buy/sell, especially if add more algorithms # , rr_buy=True
@@ -1875,11 +1866,6 @@ def retry_atrade_error_or_paper_orders_in_portfolio(portfolio, df_matching_open_
             portfolio['balance']['usd'] = portfolio['balance']['usd'] + price*quantity
             portfolio['sold'].loc[idx, ['sell_date', 'sell_price', 'roi', 'trade_notes', 'other_notes']] = [datetime.now(), price, roi, trade_notes, "Retried order-e"] # maybe refactor price to sell_price
     return portfolio
-
-import os
-from pytz import timezone
-
-eastern = timezone('US/Eastern') # maybe refactor to mimick crypto.py which uses + timedelta(hours=7) instead of using timezone
 
 def portfolio_trading(portfolio, paper_trading=True, paper_trading_on_used_account=False, portfolio_usd_value_negative_change_from_max_limit=-0.30, portfolio_current_roi_restart={'engaged': False, 'limit': 0.075}, download_and_save_tickers_data=False): # refactor to mimick run_portfolio_rr # short = False, possibly add short logic # maybe refactor buying_disabled to be None as default and then change within function (or if specified) based on certain conditions # , buying_disabled=False
     # global portfolio_account, twilio_client, twilio_phone_from, twilio_phone_to

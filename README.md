@@ -68,7 +68,7 @@ todays_date = datetime.now()
 stocks.save_usa_alpaca_tickers_fmp_data(date=todays_date.strftime('%Y-%m-%d'))
 ```
 
-## Retrieve past saved FMP data
+## Retrieve past saved FMP data (48 data points - it's what fits on a normal 13in labtop screen on regular terminal/bash/zsh/vim font)
 
 ```python
 df_tickers_2025_11_17 = stocks.get_saved_tickers_data(date='2025-11-17')
