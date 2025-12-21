@@ -1217,8 +1217,8 @@ def run_portfolio_tilupccu(portfolio, start_day=None, end_day=None, paper_tradin
         print("Error up/down move constant is not a list or a list with length 2")
         return portfolio
     PB_LIMIT, EPS_LIMIT = portfolio['constants']['up_down_move'] # , DOWN_MOVE , -portfolio['constants']['up_down_move']
-    if ((not type(PB_LIMIT) is int) or not (0 <= PB_LIMIT <= 2)) or ((not type(EPS_LIMIT) is int) or not (-10 <= EPS_LIMIT <= 10)): # [0]is pb [1] is eps
-        print("Error up/down move constants are not int or pb_limit (up/down[0]) is not within 0-2 inclusive or eps_limit (up/down[1]) is not within -10-10 inclusive")
+    if ((not type(PB_LIMIT) is int) or not (0 <= PB_LIMIT <= 2)) or ((not type(EPS_LIMIT) is int) or not (-30 <= EPS_LIMIT <= 30)): # [0]is pb [1] is eps
+        print("Error up/down move constants are not int or pb_limit (up/down[0]) is not within 0-2 inclusive or eps_limit (up/down[1]) is not within -30-30 inclusive")
         return portfolio
     DAYS = portfolio['constants']['days']
     success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_to_avoid, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)

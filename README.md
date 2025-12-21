@@ -11,7 +11,7 @@ And then import package like this:
 import speterlin_stocks.module1 as stocks
 ```
 
-For the following calls set up your Python virtual environment shell and import packages like in [quant-trading#Python script for Stocks](https://github.com/speterlin/quant-trading?tab=readme-ov-file#python-script-for-stocks-programsstocksstocks_alpaca_your_usernamepy)
+For the following calls set up your Python virtual environment shell (where you quant trade or analyze stocks) and import packages like in [quant-trading#Another Python script for Stocks](https://github.com/speterlin/quant-trading?tab=readme-ov-file#another-python-script-for-stocks-with-ai-trading-programsstocksstocks_tngaia_alpaca_your_other_usernamepy)
 
 ## Get and analyze your saved Portfolio
 
@@ -44,14 +44,7 @@ price, timestamp = last_trade_data.price, last_trade_data.timestamp
 ## USA Holidays
 
 ```python
-from pandas.tseries.holiday import USFederalHolidayCalendar
-usa_cal = USFederalHolidayCalendar()
-
-from pytz import timezone
-
-eastern = timezone('US/Eastern')
-
-usa_holidays = usa_cal.holidays(start=datetime.now(eastern).replace(month=1, day=1).strftime('%Y-%m-%d'), end=datetime.now(eastern).replace(month=12, day=31).strftime('%Y-%m-%d')).to_pydatetime()
+usa_holidays = stocks.usa_cal.holidays(start=datetime.now(stocks.eastern).replace(month=1, day=1).strftime('%Y-%m-%d'), end=datetime.now(stocks.eastern).replace(month=12, day=31).strftime('%Y-%m-%d')).to_pydatetime()
 ```
 
 ## Get and save todays FMP data
@@ -79,7 +72,12 @@ df_tickers_2025_11_17.loc['GOOGL']
 ## Get todays other (Google Trends & Yahoo Finance & Google Finance & ExchangeRate & Slickcharts & CrunchBase) data
 
 ```python
+# Standard library imports
+import re
+
+# Third Party imports
 import pandas as pd
+from fake_headers import Headers
 
 ticker, stop_day ='TSLA', datetime.now()
 
@@ -103,18 +101,12 @@ exchange_rates_usd = stocks._fetch_data(stocks.get_exchange_rates_exchangerate, 
 df_tickers_sp500 = stocks._fetch_data(stocks.get_sp500_ranked_tickers_by_slickcharts, params={}, error_str=" - No s&p 500 tickers data from Slickcharts on: " + str(datetime.now()), empty_data = pd.DataFrame())
 
 # CrunchBase downloading Tech Company data, bot detectors are quite good so currently blocked even with fake_headers and cookies
-from fake_headers import Headers
-import re
-
-todays_date = datetime.now()
-df_tickers_today = stocks.get_saved_tickers_data(date=todays_date.strftime('%Y-%m-%d'))
-
-# Peer Company Tech Company data
-# tech_companies = df_tickers_today[df_tickers_today['Sector'] == 'Technology']
+# Peer Company Tech Company data (ie if you want to analyze TSLA's competitors)
+# tech_companies = df_tickers_2025_11_17[df_tickers_2025_11_17['Sector'] == 'Technology']
 
 headers, cookies = Headers(os="mac", headers=True).generate(), {'cid': 'CihjF2EJua4XkgAtPH5jAg==', '_pxhd': 'IhifXsIJ7A98ehR9VBprDcS2R0QJLw7ZvwUY8CR9jpoQ3fvPaRezXrWDUfCcqC75orD5OSnwJYS1ZP1A9ieOqQ==:-teWJPV0KWw6Vvnu46qXzIor-OW/6skuVb7jq-NfX4yCB-PpRiHoi31hJLDhl9vQQvj7qfVoeGpVqjlXPiFQqX6rZ/ihiPQ72Z1oh0nv1SE=', '__cflb': '02DiuJLCopmWEhtqNz5agBnHnWotHyxG4jgU9FLJcAXuE'}
 company_name_re = re.compile(r'\b(?:{0}?\.)\b'.format('|'.join(['inc', 'incorporated', 'co', 'corp', 'corporation', 'ltd', 'limited', 'class a', 'american depositary shares', 'common stock', 'ordinary shares'])))
-permalink = "-".join(company_name_re.split(df_tickers_today.loc[ticker, 'Name (Alpaca)'].lower())[0].replace(',','').strip().split(" ")) # re.sub(",?(\s)", "",
+permalink = "-".join(company_name_re.split(df_tickers_2025_11_17.loc[ticker, 'Name (Alpaca)'].lower())[0].replace(',','').strip().split(" ")) # re.sub(",?(\s)", "",
 [crunchbase_data, resp_status_code] = stocks._fetch_data(stocks.get_crunchbase_data_for_ticker, params={'ticker': ticker, 'permalink_original': permalink, 'headers': headers, 'cookies': cookies}, error_str=" - No CrunchBase data for ticker: " + ticker + " with permalink_original: " + permalink + " on: " + str(datetime.now()), empty_data={})
 ```
 
@@ -122,7 +114,7 @@ permalink = "-".join(company_name_re.split(df_tickers_today.loc[ticker, 'Name (A
 
 ```python
 ticker = 'GOOGL'
-company_name, location = df_tickers_today.loc[ticker, ['Name (Alpaca)', 'Location']]
+company_name, location = df_tickers_2025_11_17.loc[ticker, ['Name (Alpaca)', 'Location']]
 buy_or_not_analysis = stocks.should_I_buy_the_stock_google_gemini_pro(ticker, company_name, location)
 rating = stocks.extract_investment_recommendation(buy_or_not_analysis, ticker)
 rating = rating if rating else stocks.extract_investment_recommendation_2(buy_or_not_analysis, ticker)
