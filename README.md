@@ -92,13 +92,13 @@ ticker_data_detailed = stocks._fetch_data(stocks.get_ticker_data_detailed_yfinan
 
 # Google Finance Scraped Data for Tech companies (NASDAQ exchange, if loop through Alpaca assets ie for asset in  stocks._fetch_data(stocks.alpaca_api.list_assets ...): asset.exchange can be extracted for every ticker = asset.symbol)
 exchange = 'NASDAQ'
-ticker_data_detailed = stocks._fetch_data(stocks.get_ticker_data_detailed_gfinance, params={'ticker': ticker, 'exchange': exchange}, error_str=" - No ticker data detailed gfinance for ticker: " + ticker + " on exchange: " + exchange + " on: " + str(datetime.now()), empty_data={})
+ticker_data_detailed = stocks._fetch_data(stocks.get_ticker_data_detailed_gfinance, params={'ticker': ticker, 'exchange': exchange}, error_str=" - No ticker data detailed Google Finance for ticker: " + ticker + " on exchange: " + exchange + " on: " + str(datetime.now()), empty_data={})
 
 # ExchangeRate
 exchange_rates_usd = stocks._fetch_data(stocks.get_exchange_rates_exchangerate, params={'base_currency': 'USD'}, error_str=" - No Exchange Rates (USD) from ExchangeRate-api on: " + str(datetime.now()), empty_data = {})
 
 # Slickcharts
-df_tickers_sp500 = stocks._fetch_data(stocks.get_sp500_ranked_tickers_by_slickcharts, params={}, error_str=" - No s&p 500 tickers data from Slickcharts on: " + str(datetime.now()), empty_data = pd.DataFrame())
+df_tickers_sp500 = stocks._fetch_data(stocks.get_sp500_ranked_tickers_by_slickcharts, params={}, error_str=" - No S&P 500 tickers data from Slickcharts on: " + str(datetime.now()), empty_data = pd.DataFrame())
 
 # CrunchBase downloading Tech Company data, bot detectors are quite good so currently blocked even with fake_headers and cookies
 # Peer Company Tech Company data (ie if you want to analyze TSLA's competitors)
