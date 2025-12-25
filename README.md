@@ -55,17 +55,21 @@ ticker = 'GOOGL'
 ticker_data_detailed = stocks._fetch_data(stocks.get_ticker_data_detailed_fmp, params={'ticker': ticker}, error_str=" - No ticker data detailed FMP for ticker: " + ticker + " on: " + str(datetime.now()), empty_data={})
 ```
 
-All of Alpaca's USA tickers (takes roughly 2-3 hours to save):
+## Get and save all of Alpaca's USA tickers data today (takes roughly 2-3 hours to save):
+
 ```python
 todays_date = datetime.now()
-stocks.save_usa_alpaca_tickers_fmp_data(date=todays_date.strftime('%Y-%m-%d'))
+# with FMP paid data (method above is called on each Alpaca ticker which has FMP data) ~roughly 29 data points / ticker
+stocks.save_usa_alpaca_tickers_fmp_or_gf_data(date=todays_date.strftime('%Y-%m-%d'))
+# with free Google Finance data (method below - Google Finance Scraped Data - is called on each Alpaca ticker which has Google Finance data) ~roughly 12 data points / ticker
+stocks.save_usa_alpaca_tickers_fmp_or_gf_data(date=todays_date.strftime('%Y-%m-%d'), fmp_paid_data=False)
 ```
 
-## Retrieve past saved FMP data (48 data points - it's what fits on a normal 13in labtop screen on regular terminal/bash/zsh/vim font)
+## Retrieve past saved FMP data (49 data points - it's what fits on a normal 13in labtop screen on regular terminal/bash/zsh/vim font)
 
 ```python
 df_tickers_2025_11_17 = stocks.get_saved_tickers_data(date='2025-11-17')
-# View the 48 saved data points on GOOGL
+# View the 49 saved data points on GOOGL
 df_tickers_2025_11_17.loc['GOOGL']
 ```
 
