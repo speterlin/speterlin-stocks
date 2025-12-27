@@ -13,7 +13,7 @@ import speterlin_stocks.module1 as stocks
 
 For the following calls set up your Python virtual environment shell (where you quant trade or analyze stocks) and import packages like in [quant-trading#Another Python script for Stocks](https://github.com/speterlin/quant-trading?tab=readme-ov-file#another-python-script-for-stocks-with-ai-trading-programsstocksstocks_tngaia_alpaca_your_other_usernamepy)
 
-## Get and analyze your saved Portfolio
+## Get (in quant-trading directory ~data/stocks/saved_portfolio_backups/alpaca_<<your_username>>) and analyze your saved Portfolio
 
 ```python
 portfolio = stocks.get_saved_portfolio_backup("portfolio_rr_50_-50_20_-0.2_0.2_-0.05_2000_100_True_False_False_{'usd': 10000}_2024-12-01_to_" + datetime.now().strftime('%Y-%m-%d'))
@@ -47,7 +47,7 @@ price, timestamp = last_trade_data.price, last_trade_data.timestamp
 usa_holidays = stocks.usa_cal.holidays(start=datetime.now(stocks.eastern).replace(month=1, day=1).strftime('%Y-%m-%d'), end=datetime.now(stocks.eastern).replace(month=12, day=31).strftime('%Y-%m-%d')).to_pydatetime()
 ```
 
-## Get and save todays FMP data
+## Get todays FMP data
 
 Single ticker detailed data:
 ```python
@@ -55,7 +55,7 @@ ticker = 'GOOGL'
 ticker_data_detailed = stocks._fetch_data(stocks.get_ticker_data_detailed_fmp, params={'ticker': ticker}, error_str=" - No ticker data detailed FMP for ticker: " + ticker + " on: " + str(datetime.now()), empty_data={})
 ```
 
-## Get and save all of Alpaca's USA tickers data today (takes roughly 2-3 hours to save):
+## Get and save (in quant-trading directory ~data/stocks/saved_tickers_data/usa_alpaca_by_yf_and_fmp_or_gf) all of Alpaca's USA tickers data today (takes roughly 2-3 hours to save):
 
 ```python
 todays_date = datetime.now()
@@ -65,7 +65,7 @@ stocks.save_usa_alpaca_tickers_fmp_or_gf_data(date=todays_date.strftime('%Y-%m-%
 stocks.save_usa_alpaca_tickers_fmp_or_gf_data(date=todays_date.strftime('%Y-%m-%d'), fmp_paid_data=False)
 ```
 
-## Retrieve past saved FMP data (49 data points - it's what fits on a normal 13in labtop screen on regular terminal/bash/zsh/vim font)
+## Retrieve past saved (in directory above) FMP data (49 data points - it's what fits on a normal 13in labtop screen on regular terminal/bash/zsh/vim font)
 
 ```python
 df_tickers_2025_11_17 = stocks.get_saved_tickers_data(date='2025-11-17')

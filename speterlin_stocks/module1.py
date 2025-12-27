@@ -482,7 +482,7 @@ def get_exchange_rates_exchangerate(base_currency="USD"):
     #     return response.status_code
     return rates_dict
 
-def get_ticker_data_detailed_gfinance(ticker, exchange):
+def get_ticker_data_detailed_gfinance(ticker, exchange, **params):
     headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10 7 4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'} # {'User-Agent': 'Mozilla/4.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'} # maybe refactor here and below, might change header to something else but doesn't matter just tricking the server (fighting bots / crawlers) into thinking it's a browser making the request, header is from https://stackoverflow.com/questions/68259148/getting-404-error-for-certain-stocks-and-pages-on-yahoo-finance-python
     site_url = 'https://www.google.com/finance/quote/' + ticker + ':' + exchange # 'https://www.investing.com/equities/google-inc' # + ticker + '/' + (options['type'] if options['engaged'] else '') # https://finance.yahoo.com/quote/TSLA/key-statistics?p=TSLA&.tsrc=fin-srch
     resp = requests.get(site_url, headers=headers) # , auth=(username, password)) # maybe add timeout=50 to avoid unsolved_error (see requests documentation)
@@ -490,7 +490,7 @@ def get_ticker_data_detailed_gfinance(ticker, exchange):
     last = float(soup.find('div', {'class': 'AHmHk'}).text.strip().replace('$',"").replace(',',""))
     divs = soup.find_all('div', {'class': 'gyFHrc'}) # divs = soup.find('div', {'class': 'eYanAe'}).find_all('div')
     data, times_table = {'Last': last}, {'T': 1e12, 'B': 1e9, 'M': 1e6, 'K': 1e3}
-    exchange_rates_usd = _fetch_data(get_exchange_rates_exchangerate, params={'base_currency': 'USD'}, error_str=" - No Exchange Rates (USD) from ExchangeRate-api on: " + str(datetime.now()), empty_data = {})
+    exchange_rates_usd = params['exchange_rates_usd'] if ('exchange_rates_usd' in params and params['exchange_rates_usd']) else _fetch_data(get_exchange_rates_exchangerate, params={'base_currency': 'USD'}, error_str=" - No Exchange Rates (USD) from ExchangeRate-api on: " + str(datetime.now()), empty_data = {}) # check to see if there is value since there were issues on many requests
     for div in divs:
         # print(div.text)
         current_label = div.find('div', {'class': 'mfs7Fc'}).text.strip()
@@ -672,6 +672,7 @@ def save_tickers_daily_gainers_fmp(df_tickers, date, additions=[]): # date is in
 def save_usa_alpaca_tickers_fmp_or_gf_data(date, fmp_paid_data=True): # maybe refactor and take away ms since not showing up most of time # date is in format '%Y-%m-%d'
     df_usa_alpaca_tickers_fmp_or_gf_ms_zr_data = pd.DataFrame(columns = ['Name (Alpaca)', 'ID (Alpaca)', 'Exchange (Alpaca)', 'Shortable (Alpaca)', 'Easy to Borrow (Alpaca)', 'Class (Alpaca)', 'Asset Type', 'Market Cap', 'Sector', 'Industry', 'CEO', 'Website', '# Employees', 'Location', 'Last', 'Volume', 'P/E (TTM)', 'Forward P/E', 'P/S (TTM)', 'Basic EPS (FY)', 'Basic EPS (TTM)', 'PEG Ratio (TTM)', 'Div Yield (FY)', 'P/B (TTM)', 'EBITDA', 'EV/EBITDA (TTM)', 'D/E (TTM)', 'Net Income Ratio', 'Revenue (Past 5 years)', 'Gross Profit Ratio (Past 5 years)', 'Total Assets (Past 5 years)', 'Total Liabilities (Past 5 years)', 'Cash and Cash Equivalents (Past 5 years)', 'Long-Term Debt (Past 5 years)', 'Past 5 years', 'Beta', 'Short of Float Ratio', 'Short Ratio', 'Day range', 'Year range', '200D Avg', '50D Avg', 'Morningstar Rating', 'Held by Institutions Ratio', 'Held by Insiders Ratio', 'FMP Rank', 'FMP Rank Date', 'Zacks Rank', 'Zacks Updated At']).astype({'Name (Alpaca)': 'object', 'ID (Alpaca)': 'object', 'Exchange (Alpaca)': 'object', 'Shortable (Alpaca)': 'bool', 'Easy to Borrow (Alpaca)': 'bool', 'Class (Alpaca)': 'object', 'Asset Type': 'object', 'Market Cap': 'float64', 'Sector': 'object', 'Industry': 'object', 'CEO': 'object', 'Website': 'object', '# Employees': 'float64', 'Location': 'object', 'Last': 'float64', 'Volume': 'float64', 'P/E (TTM)': 'float64', 'Forward P/E': 'float64', 'P/S (TTM)': 'float64', 'Basic EPS (FY)': 'float64', 'Basic EPS (TTM)': 'float64', 'PEG Ratio (TTM)': 'float64', 'Div Yield (FY)': 'float64', 'P/B (TTM)': 'float64', 'EBITDA': 'float64', 'EV/EBITDA (TTM)': 'float64', 'D/E (TTM)': 'float64', 'Net Income Ratio': 'float64', 'Revenue (Past 5 years)': 'object', 'Gross Profit Ratio (Past 5 years)': 'object', 'Total Assets (Past 5 years)': 'object', 'Total Liabilities (Past 5 years)': 'object', 'Cash and Cash Equivalents (Past 5 years)': 'object', 'Long-Term Debt (Past 5 years)': 'object', 'Past 5 years': 'object', 'Beta': 'float64', 'Short of Float Ratio': 'float64', 'Short Ratio': 'float64', 'Day range': 'object', 'Year range': 'object', '200D Avg': 'float64', '50D Avg': 'float64', 'Morningstar Rating': 'float64', 'Held by Institutions Ratio': 'float64', 'Held by Insiders Ratio': 'float64', 'FMP Rank': 'float64', 'FMP Rank Date': 'datetime64[ns]', 'Zacks Rank': 'float64', 'Zacks Updated At': 'datetime64[ns]'}) # maybe refactor and add columns which measure other KPIs, like in save_usa_tv_tickers_zacks_data, "S&P 500 Rank"
     count = 0
+    exchange_rates_usd = _fetch_data(get_exchange_rates_exchangerate, params={'base_currency': 'USD'}, error_str=" - No Exchange Rates (USD) from ExchangeRate-api on: " + str(datetime.now()), empty_data = {})
     for asset in _fetch_data(alpaca_api.list_assets, params={}, error_str=" - No listed assets from Alpaca on: " + str(datetime.now()), empty_data = []): # since only about 1/2-2/3 of alpaca assets are adequate (have market cap data), can use scrape to get adequate assets from a site that allows scraping # alpaca assets (organization / order in which listed) data changed on 2021-03-12, but possibly corrected on 2021-03-16
         ticker = asset.symbol # not using upper() as precautionary, should already be in upper
         # if ticker in df_usa_alpaca_tickers_fmp_or_gf_ms_zr_data.index:
@@ -749,12 +750,26 @@ def save_usa_alpaca_tickers_fmp_or_gf_data(date, fmp_paid_data=True): # maybe re
                 ]
             else:
                 exchange = asset.exchange
-                ticker_data_detailed = _fetch_data(get_ticker_data_detailed_gfinance, params={'ticker': ticker, 'exchange': exchange}, error_str=" - No ticker data detailed Google Finance for ticker: " + ticker + " on exchange: " + exchange + " on: " + str(datetime.now()), empty_data={})
+                ticker_data_detailed = _fetch_data(get_ticker_data_detailed_gfinance, params={'ticker': ticker, 'exchange': exchange, 'exchange_rates_usd': exchange_rates_usd}, error_str=" - No ticker data detailed Google Finance for ticker: " + ticker + " on exchange: " + exchange + " on: " + str(datetime.now()), empty_data={})
                 if not ticker_data_detailed:
                     continue
                 df_usa_alpaca_tickers_fmp_or_gf_ms_zr_data.loc[ticker,
                     ['Name (Alpaca)', 'ID (Alpaca)', 'Exchange (Alpaca)', 'Shortable (Alpaca)', 'Easy to Borrow (Alpaca)', 'Class (Alpaca)', 'Market Cap', 'CEO', 'Website', '# Employees', 'Location', 'Last', 'Volume', 'P/E (TTM)', 'Basic EPS (TTM)', 'Div Yield (FY)', 'Day range', 'Year range'] # maybe add regex search for words before 'conglomerate'|'holding company'|'company' to get 'Sector', 'Industry'
-                ] = [asset.name, asset.id, asset.exchange, asset.shortable, asset.easy_to_borrow, asset.__getattr__('class'), ticker_data_detailed['Market cap'], ticker_data_detailed['CEO'], ticker_data_detailed['Website'], ticker_data_detailed['Employees'], ticker_data_detailed['Headquarters'], ticker_data_detailed['Last'], ticker_data_detailed['Avg Volume'], ticker_data_detailed['P/E ratio'], ticker_data_detailed['EPS (TTM)'], ticker_data_detailed['Dividend yield'], ticker_data_detailed['Day range'], ticker_data_detailed['Year range']]
+                ] = [
+                    asset.name, asset.id, asset.exchange, asset.shortable, asset.easy_to_borrow, asset.__getattr__('class'),
+                    ticker_data_detailed['Market cap'] if 'Market cap' in ticker_data_detailed else float("NaN"),
+                    ticker_data_detailed['CEO'] if 'CEO' in ticker_data_detailed else None,
+                    ticker_data_detailed['Website'] if 'Website' in ticker_data_detailed else None,
+                    ticker_data_detailed['Employees'] if 'Employees' in ticker_data_detailed else float("NaN"),
+                    ticker_data_detailed['Headquarters'] if 'Headquarters' in ticker_data_detailed else None,
+                    ticker_data_detailed['Last'] if 'Last' in ticker_data_detailed else float("NaN"),
+                    ticker_data_detailed['Avg Volume'] if 'Avg Volume' in ticker_data_detailed else float("NaN"),
+                    ticker_data_detailed['P/E ratio'] if 'P/E ratio' in ticker_data_detailed else float("NaN"),
+                    ticker_data_detailed['EPS (TTM)'] if 'EPS (TTM)' in ticker_data_detailed else float("NaN"),
+                    ticker_data_detailed['Dividend yield'] if 'Dividend yield' in ticker_data_detailed else float("NaN"),
+                    ticker_data_detailed['Day range'] if 'Day range' in ticker_data_detailed else None,
+                    ticker_data_detailed['Year range'] if 'Year range' in ticker_data_detailed else None
+                ]
         except Exception as e:
             print(str(e) + " - No (or issue with) ticker data detailed " + ("FMP" if fmp_paid_data else "Google Finance") + " for ticker: " + ticker + " on exchange: " + asset.exchange + " on: " + str(datetime.now()) + ", Execution time: " + str(time.time() - start_time)) # or zacks data
     save_tickers_yf_and_fmp_or_gf_data(df_usa_alpaca_tickers_fmp_or_gf_ms_zr_data, date)
@@ -1575,6 +1590,7 @@ def senate_timestamps_and_tickers_inflows_and_outflows_by_month_for_stocks(stock
     amounts_to_map = {'$15,001 - $50,000':33000, '$1,001 - $15,000':7500, '$50,001 - $100,000':75000, '$100,001 - $250,000':175000, '$1,000,001 - $5,000,000':2500000, '$500,001 - $1,000,000':750000, '$250,001 - $500,000':375000, '$5,000,001 - $25,000,000':15000000}
     for ticker in stocks_list:
         try:
+            # no _fetch_data call here since already in a try statement and want it to fail (if data retrieval issue) before going on to next line
             senate_df = get_senate_trading_symbol_fmp(ticker=ticker) # senate_df[['transactionDate', 'office', 'assetDescription', 'assetType', 'amount', 'comment', 'full_name']]
             senate_df['amount_fixed'] = senate_df['amount'].map(amounts_to_map)
             senate_df['direction'] = senate_df['type'].apply(lambda x: 1 if x=='Purchase' else -1)
