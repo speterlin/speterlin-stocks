@@ -484,6 +484,7 @@ def get_exchange_rates_exchangerate(base_currency="USD"):
 
 def get_ticker_data_detailed_gfinance(ticker, exchange, **params):
     headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10 7 4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'} # {'User-Agent': 'Mozilla/4.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'} # maybe refactor here and below, might change header to something else but doesn't matter just tricking the server (fighting bots / crawlers) into thinking it's a browser making the request, header is from https://stackoverflow.com/questions/68259148/getting-404-error-for-certain-stocks-and-pages-on-yahoo-finance-python
+    exchange = 'NYSEARCA' if exchange == 'ARCA' else exchange # maybe refactor need to see more logs # Alpaca returns 'ARCA' for 'NYSEARCA'
     site_url = 'https://www.google.com/finance/quote/' + ticker + ':' + exchange # 'https://www.investing.com/equities/google-inc' # + ticker + '/' + (options['type'] if options['engaged'] else '') # https://finance.yahoo.com/quote/TSLA/key-statistics?p=TSLA&.tsrc=fin-srch
     resp = requests.get(site_url, headers=headers) # , auth=(username, password)) # maybe add timeout=50 to avoid unsolved_error (see requests documentation)
     soup = bs.BeautifulSoup(resp.text, 'html.parser')
@@ -519,7 +520,7 @@ def get_ticker_data_detailed_gfinance(ticker, exchange, **params):
             current_value = div.find('div', {'class': 'P6K39c'}).text.strip().replace('$',"").replace(',',"").replace(' ',"").replace('%',"")
             current_value = float("NaN") if current_value in ["∞", "-", "--", "No Data", "No"] else float(current_value)/100.0 if current_label in ['Dividend yield'] else float(current_value) if current_label in ['Previous close', 'P/E ratio', 'Employees'] else current_value #
         data[current_label] = current_value
-    data['EPS (TTM)'] = (1 / data['P/E ratio']) * last if 'P/E ratio' in data else float("NaN") # P/E is using TTM assuming it's basic earnings (confirmed by Google AI)
+    data['EPS (TTM)'] = (1 / data['P/E ratio']) * last if ('P/E ratio' in data and data['P/E ratio']) else float("NaN") # P/E is using TTM assuming it's basic earnings (confirmed by Google AI)
     return data
 
 def should_I_buy_the_stock_openai (analysis): # extract_investment_recommendation_openai # , ai="google-gemini-pro"
@@ -718,7 +719,7 @@ def save_usa_alpaca_tickers_fmp_or_gf_data(date, fmp_paid_data=True): # maybe re
                     None, # ticker_data_detailed['defaultKeyStatistics']['forwardPE'] if ('forwardPE' in ticker_data_detailed['defaultKeyStatistics']) else float("NaN"), # good to fail if no 'defaultKeyStatistics' since contains key metrics, failing on bad assets like: ['BCV-A', 'MH-D'], assets not worth extra logic # after analyzing TEAM on 2021-05-13 most likely this value is for the next 12 months and not fiscal year, but not 100% sure so leaving the description above as is
                     ticker_data_detailed['ratios'][0]['priceToSalesRatioTTM'] if 'priceToSalesRatioTTM' in ticker_data_detailed['ratios'][0] else float("NaN"),
                     ticker_data_detailed['financialsAnnual']['income'][0]['eps'] if (ticker_data_detailed['financialsAnnual']['income'] and 'eps' in ticker_data_detailed['financialsAnnual']['income'][0]) else float("NaN"), # extra check here and below since ETFs some other assets don't have income # ['defaultKeyStatistics']['trailingEps'] if ('trailingEps' in ticker_data_detailed['defaultKeyStatistics']) else float("NaN"), # maybe refactor - (unresolved) unsure why 'trailingEps' failing on quite a few Nano Cap tickers like: ['AEG', 'AJXA', 'YOLO', 'FFTY'] # if ('defaultKeyStatistics' in ticker_data_detailed...
-                    (1/ticker_data_detailed['ratios'][0]['peRatioTTM'])*ticker_data_detailed['profile']['price'] if 'peRatioTTM' in ticker_data_detailed['ratios'][0] else float("NaN"),
+                    (1/ticker_data_detailed['ratios'][0]['peRatioTTM'])*ticker_data_detailed['profile']['price'] if (('peRatioTTM' in ticker_data_detailed['ratios'][0]) and ticker_data_detailed['ratios'][0]['peRatioTTM']) else float("NaN"),
                     ticker_data_detailed['ratios'][0]['pegRatioTTM'] if 'pegRatioTTM' in ticker_data_detailed['ratios'][0] else float("NaN"), # P/E ratio / Expected Earnings Growth Rate
                     None, # ticker_data_detailed['summaryDetail']['dividendYield'] if ('summaryDetail' in ticker_data_detailed and ticker_data_detailed['summaryDetail'] and 'dividendYield' in ticker_data_detailed['summaryDetail']) else float("NaN"),
                     ticker_data_detailed['ratios'][0]['priceToBookRatioTTM'] if 'priceToBookRatioTTM' in ticker_data_detailed['ratios'][0] else float("NaN"),
