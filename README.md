@@ -55,7 +55,7 @@ ticker = 'GOOGL'
 ticker_data_detailed = stocks._fetch_data(stocks.get_ticker_data_detailed_fmp, params={'ticker': ticker}, error_str=" - No ticker data detailed FMP for ticker: " + ticker + " on: " + str(datetime.now()), empty_data={})
 ```
 
-## Get and save (in quant-trading directory ~data/stocks/saved_tickers_data/usa_alpaca_by_yf_and_fmp_or_gf) all of Alpaca's USA tickers data today (takes roughly 2-3 hours to save):
+## Get and save (in quant-trading directory ~data/stocks/saved_tickers_data/usa_alpaca_by_yf_and_fmp_or_gf) all of Alpaca's USA tickers data today (takes roughly 2-3 hours to save - for FMP data - or ~4 hours to save - for Google Finance data):
 
 ```python
 todays_date = datetime.now()

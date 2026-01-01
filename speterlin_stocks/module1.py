@@ -1895,7 +1895,7 @@ def retry_atrade_error_or_paper_orders_in_portfolio(portfolio, df_matching_open_
             portfolio['sold'].loc[idx, ['sell_date', 'sell_price', 'roi', 'trade_notes', 'other_notes']] = [datetime.now(), price, roi, trade_notes, "Retried order-e"] # maybe refactor price to sell_price
     return portfolio
 
-def portfolio_trading(portfolio, paper_trading=True, paper_trading_on_used_account=False, portfolio_usd_value_negative_change_from_max_limit=-0.30, portfolio_current_roi_restart={'engaged': False, 'limit': 0.075}, download_and_save_tickers_data=False): # refactor to mimick run_portfolio_rr # short = False, possibly add short logic # maybe refactor buying_disabled to be None as default and then change within function (or if specified) based on certain conditions # , buying_disabled=False
+def portfolio_trading(portfolio, paper_trading=True, paper_trading_on_used_account=False, portfolio_usd_value_negative_change_from_max_limit=-0.30, portfolio_current_roi_restart={'engaged': False, 'limit': 0.075}, download_and_save_tickers_data=False, fmp_paid_data=False): # refactor to mimick run_portfolio_rr # short=False, possibly add short logic # maybe refactor buying_disabled=False as default and then change within function (or if specified) based on certain conditions
     # global portfolio_account, twilio_client, twilio_phone_from, twilio_phone_to
     DAYS = portfolio['constants']['days']
     STOP_LOSS = portfolio['constants']['sl']
@@ -1915,7 +1915,7 @@ def portfolio_trading(portfolio, paper_trading=True, paper_trading_on_used_accou
                 todays_date = datetime.now() # no need to change to 13:00:00 time since fmp calls take the date in simple string format (no %H:%M:%S): datetime_object.strftime('%Y-%m-%d')
                 df_tickers_interval_today = get_saved_tickers_data(date=todays_date.strftime('%Y-%m-%d'))
                 if df_tickers_interval_today.empty and download_and_save_tickers_data:
-                    df_tickers_interval_today = save_usa_alpaca_tickers_fmp_or_gf_data(date=todays_date.strftime('%Y-%m-%d')) # maybe refactor (especially if in timezone far off eastern), not using eastern since run late at night and could extend into next day (in eastern time) # set variable within if statement
+                    df_tickers_interval_today = save_usa_alpaca_tickers_fmp_or_gf_data(date=todays_date.strftime('%Y-%m-%d'), fmp_paid_data=fmp_paid_data) # maybe refactor (especially if in timezone far off eastern), not using eastern since run late at night and could extend into next day (in eastern time) # set variable within if statement
                 else:
                     # df_tickers_interval_today = get_saved_tickers_data(date=todays_date.strftime('%Y-%m-%d'))
                     while df_tickers_interval_today.empty:
