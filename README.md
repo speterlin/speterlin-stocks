@@ -60,9 +60,9 @@ ticker_data_detailed = stocks._fetch_data(stocks.get_ticker_data_detailed_fmp, p
 ```python
 todays_date = datetime.now()
 # with FMP paid data (method above is called on each Alpaca ticker which has FMP data) ~roughly 29 data points / ticker
+stocks.save_usa_alpaca_tickers_fmp_or_gf_data(date=todays_date.strftime('%Y-%m-%d'), fmp_paid_data=True)
+# with free Google Finance data (method below - Google Finance Scraped Data - is called on each Alpaca ticker which has Google Finance data) ~roughly 12 data points / ticker, fmp_paid_data default is False
 stocks.save_usa_alpaca_tickers_fmp_or_gf_data(date=todays_date.strftime('%Y-%m-%d'))
-# with free Google Finance data (method below - Google Finance Scraped Data - is called on each Alpaca ticker which has Google Finance data) ~roughly 12 data points / ticker
-stocks.save_usa_alpaca_tickers_fmp_or_gf_data(date=todays_date.strftime('%Y-%m-%d'), fmp_paid_data=False)
 ```
 
 ## Retrieve past saved (in directory above) FMP data (49 data points - it's what fits on a normal 13in labtop screen on regular terminal/bash/zsh/vim font)
@@ -145,5 +145,5 @@ portfolios = {
 ## Send message to your Phone via Twilio
 
 ```python
-twilio_message = stocks._fetch_data(stocks.twilio_client.messages.create, params={'to': twilio_phone_to, 'from_': twilio_phone_from, 'body': "Q Trading @stocks #" + stocks.portfolio_account + ": running on " + str(datetime.now()) + " :)"}, error_str=" - Twilio msg error to: " + twilio_phone_to + " on: " + str(datetime.now()), empty_data=None)
+twilio_message = stocks._fetch_data(stocks.twilio_client.messages.create, params={'to': stocks.twilio_phone_to, 'from_': stocks.twilio_phone_from, 'body': "Q Trading @stocks #" + stocks.portfolio_account + ": running on " + str(datetime.now()) + " :)"}, error_str=" - Twilio msg error to: " + stocks.twilio_phone_to + " on: " + str(datetime.now()), empty_data=None)
 ```

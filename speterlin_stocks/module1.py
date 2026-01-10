@@ -101,6 +101,7 @@ __all__ = [
     "save_portfolio_backup",
     "get_saved_portfolio_backup",
 ]
+headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10 7 4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'} # {'User-Agent': 'Mozilla/4.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'} # maybe refactor here and below, might change header to something else but doesn't matter just tricking the server (fighting bots / crawlers) into thinking it's a browser making the request, header is from https://stackoverflow.com/questions/68259148/getting-404-error-for-certain-stocks-and-pages-on-yahoo-finance-python # {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'}
 openai_functions=[
     {
         "name": "get_company_stock_ticker",
@@ -182,7 +183,6 @@ def trendline(data, order=1, reverse_to_ascending=False):
 def get_zacks_data(ticker=None):
     # zacks rank, can also do motley fool, found from github.com/janlukasschroeder/zacks-api
     # proxies = {'http':'http://localhost:port','https':'http://localhost:port'}
-    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10 7 4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'} #
     resp = requests.get("https://quote-feed.zacks.com/?t=" + ticker, headers=headers, verify=False) # proxies=proxies, #) # , verify=False # can add installing openssl: https://stackoverflow.com/questions/51768496/why-do-https-requests-produce-ssl-certificate-verify-failed-error, https://www.google.com/search?q=browser+request+vs.+python+requests.get&oq=browser+request+vs.+python+requests.get&aqs=chrome..69i57.8276j0j7&sourceid=chrome&ie=UTF-8
     data = resp.json()
     return data
@@ -366,7 +366,6 @@ def get_ticker_data_yf(ticker, start_datetime=None, end_datetime=None, interval=
     return data
 
 def get_ticker_data_detailed_yfinance(ticker, options={'engaged': False, 'type': 'key-statistics'}, additional_page={'engaged': False, 'type': 'profile'}): # maybe refactor to incorporate multiple options # 'financials' # financial options doesn't include 'summaryProfile', 'defaultKeyStatistics', 'financialData'
-    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10 7 4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'} # {'User-Agent': 'Mozilla/4.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'} # maybe refactor here and below, might change header to something else but doesn't matter just tricking the server (fighting bots / crawlers) into thinking it's a browser making the request, header is from https://stackoverflow.com/questions/68259148/getting-404-error-for-certain-stocks-and-pages-on-yahoo-finance-python
     site_url = 'https://finance.yahoo.com/quote/' + ticker + '/' # https://finance.yahoo.com/quote/TSLA/key-statistics?p=TSLA&.tsrc=fin-srch
     resp = requests.get(site_url, headers=headers) # , auth=(username, password)) # maybe add timeout=50 to avoid unsolved_error (see requests documentation)
     soup = bs.BeautifulSoup(resp.text, 'html.parser')
@@ -429,7 +428,6 @@ def get_ticker_data_detailed_yfinance(ticker, options={'engaged': False, 'type':
 
 def get_tickers_with_stock_splits_in_day_yfinance(date, tickers_for_period): # date is a string in format '%Y-%m-%d' (example: '2021-03-12')
     tickers = {} # , random_int , randint(0, 100)
-    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10 7 4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'} # {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'}
     # if random_int % 20 == 0:
     #     print("Sleeping 30 seconds for random int " + str(random_int) + " % 20 == 0 on: " + str(datetime.now()))
     #     time.sleep(30)
@@ -472,7 +470,6 @@ def get_tickers_with_stock_splits_in_period_yfinance(start_day, **params): # no 
     return tickers_for_period
 
 def get_exchange_rates_exchangerate(base_currency="USD"):
-    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10 7 4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'} #
     site_url = 'https://api.exchangerate-api.com/v4/latest/' + base_currency
     resp = requests.get(site_url, headers=headers) #
     # if resp.status_code == 200:
@@ -483,7 +480,6 @@ def get_exchange_rates_exchangerate(base_currency="USD"):
     return rates_dict
 
 def get_ticker_data_detailed_gfinance(ticker, exchange, **params):
-    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10 7 4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'} # {'User-Agent': 'Mozilla/4.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'} # maybe refactor here and below, might change header to something else but doesn't matter just tricking the server (fighting bots / crawlers) into thinking it's a browser making the request, header is from https://stackoverflow.com/questions/68259148/getting-404-error-for-certain-stocks-and-pages-on-yahoo-finance-python
     exchange = 'NYSEARCA' if exchange == 'ARCA' else exchange # maybe refactor need to see more logs # Alpaca returns 'ARCA' for 'NYSEARCA'
     site_url = 'https://www.google.com/finance/quote/' + ticker + ':' + exchange # 'https://www.investing.com/equities/google-inc' # + ticker + '/' + (options['type'] if options['engaged'] else '') # https://finance.yahoo.com/quote/TSLA/key-statistics?p=TSLA&.tsrc=fin-srch
     resp = requests.get(site_url, headers=headers) # , auth=(username, password)) # maybe add timeout=50 to avoid unsolved_error (see requests documentation)
@@ -602,7 +598,7 @@ def extract_investment_recommendation_2(analysis, ticker):
     # rating = google_gemini_pro_model.generate_content(f"Given the Google Gemini Pro analysis, what is the numeric investment recommendation on a scale of 1-10 of the company stock ticker ?: {analysis.text}?")
     return rating
 
-def get_google_trends_pt(kw_list, from_date, to_date, trend_days=270, cat=0, geo='', tz=480, gprop='', hl='en-US', isPartial_col=False, from_start=False, scale_cols=True): # trend_days max is around 270 # category to narrow results # geo e.g 'US', 'UK' # tz = timezone offset default is 360 which is US CST (UTC-6), PST is 480 (assuming UTC-8*60) # hl language default is en-US # gprop : filter results to specific google property like 'images', 'news', 'youtube' or 'froogle' # overlap=100, sleeptime=1, not doing multiple searches # other variables: timeout=(10,25), proxies=['https://34.203.233.13:80',], retries=2, backoff_factor=0.1, requests_args={'verify':False}
+def get_google_trends_pt(kw_list, from_date, to_date, trend_days=270, cat=0, geo='', tz=480, gprop='', hl='en-US', isPartial_col=False): # trend_days max is around 270 # category to narrow results # geo e.g 'US', 'UK' # tz = timezone offset default is 360 which is US CST (UTC-6), PST is 480 (assuming UTC-8*60) # hl language default is en-US # gprop : filter results to specific google property like 'images', 'news', 'youtube' or 'froogle' (original name for Google Product Search) # overlap=100, sleeptime=1, not doing multiple searches # other variables: timeout=(10,25), proxies=['https://34.203.233.13:80',], retries=2, backoff_factor=0.1, requests_args={'verify':False}, from_start=False, scale_cols=True
     data = pd.DataFrame()
     if len(kw_list) != 1: # not doing multirange_interest_over_time: len(kw_list)==0 or len(kw_list)>5
         print("Error: The keyword list must be 1, not doing multirange_interest_over_time") # be > 0 and can contain at most 5 words
@@ -670,7 +666,7 @@ def save_tickers_daily_gainers_fmp(df_tickers, date, additions=[]): # date is in
     pd.to_pickle(df_tickers, f)
     f.close()
 
-def save_usa_alpaca_tickers_fmp_or_gf_data(date, fmp_paid_data=True): # maybe refactor and take away ms since not showing up most of time # date is in format '%Y-%m-%d'
+def save_usa_alpaca_tickers_fmp_or_gf_data(date, fmp_paid_data=False): # maybe refactor and take away ms since not showing up most of time # date is in format '%Y-%m-%d'
     df_usa_alpaca_tickers_fmp_or_gf_ms_zr_data = pd.DataFrame(columns = ['Name (Alpaca)', 'ID (Alpaca)', 'Exchange (Alpaca)', 'Shortable (Alpaca)', 'Easy to Borrow (Alpaca)', 'Class (Alpaca)', 'Asset Type', 'Market Cap', 'Sector', 'Industry', 'CEO', 'Website', '# Employees', 'Location', 'Last', 'Volume', 'P/E (TTM)', 'Forward P/E', 'P/S (TTM)', 'Basic EPS (FY)', 'Basic EPS (TTM)', 'PEG Ratio (TTM)', 'Div Yield (FY)', 'P/B (TTM)', 'EBITDA', 'EV/EBITDA (TTM)', 'D/E (TTM)', 'Net Income Ratio', 'Revenue (Past 5 years)', 'Gross Profit Ratio (Past 5 years)', 'Total Assets (Past 5 years)', 'Total Liabilities (Past 5 years)', 'Cash and Cash Equivalents (Past 5 years)', 'Long-Term Debt (Past 5 years)', 'Past 5 years', 'Beta', 'Short of Float Ratio', 'Short Ratio', 'Day range', 'Year range', '200D Avg', '50D Avg', 'Morningstar Rating', 'Held by Institutions Ratio', 'Held by Insiders Ratio', 'FMP Rank', 'FMP Rank Date', 'Zacks Rank', 'Zacks Updated At']).astype({'Name (Alpaca)': 'object', 'ID (Alpaca)': 'object', 'Exchange (Alpaca)': 'object', 'Shortable (Alpaca)': 'bool', 'Easy to Borrow (Alpaca)': 'bool', 'Class (Alpaca)': 'object', 'Asset Type': 'object', 'Market Cap': 'float64', 'Sector': 'object', 'Industry': 'object', 'CEO': 'object', 'Website': 'object', '# Employees': 'float64', 'Location': 'object', 'Last': 'float64', 'Volume': 'float64', 'P/E (TTM)': 'float64', 'Forward P/E': 'float64', 'P/S (TTM)': 'float64', 'Basic EPS (FY)': 'float64', 'Basic EPS (TTM)': 'float64', 'PEG Ratio (TTM)': 'float64', 'Div Yield (FY)': 'float64', 'P/B (TTM)': 'float64', 'EBITDA': 'float64', 'EV/EBITDA (TTM)': 'float64', 'D/E (TTM)': 'float64', 'Net Income Ratio': 'float64', 'Revenue (Past 5 years)': 'object', 'Gross Profit Ratio (Past 5 years)': 'object', 'Total Assets (Past 5 years)': 'object', 'Total Liabilities (Past 5 years)': 'object', 'Cash and Cash Equivalents (Past 5 years)': 'object', 'Long-Term Debt (Past 5 years)': 'object', 'Past 5 years': 'object', 'Beta': 'float64', 'Short of Float Ratio': 'float64', 'Short Ratio': 'float64', 'Day range': 'object', 'Year range': 'object', '200D Avg': 'float64', '50D Avg': 'float64', 'Morningstar Rating': 'float64', 'Held by Institutions Ratio': 'float64', 'Held by Insiders Ratio': 'float64', 'FMP Rank': 'float64', 'FMP Rank Date': 'datetime64[ns]', 'Zacks Rank': 'float64', 'Zacks Updated At': 'datetime64[ns]'}) # maybe refactor and add columns which measure other KPIs, like in save_usa_tv_tickers_zacks_data, "S&P 500 Rank"
     count = 0
     exchange_rates_usd = _fetch_data(get_exchange_rates_exchangerate, params={'base_currency': 'USD'}, error_str=" - No Exchange Rates (USD) from ExchangeRate-api on: " + str(datetime.now()), empty_data = {})
@@ -1059,7 +1055,6 @@ def update_portfolio_buy_and_sell_tickers(portfolio, tickers_to_buy, tickers_to_
     return portfolio
 
 def get_sp500_ranked_tickers_by_slickcharts() :
-    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10 7 4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'}
     resp = requests.get('https://www.slickcharts.com/sp500', headers=headers, verify=False)
     soup = bs.BeautifulSoup(resp.text, 'lxml')
     table = soup.find('table', {'class': 'table table-hover table-borderless table-sm'})
@@ -1111,10 +1106,10 @@ def run_portfolio(portfolio, **params): # call portfolio = run_portfolio(portfol
     return portfolio
 
 def check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, back_running_allowance=17.5, **params):
-    days = portfolio['constants']['days']
+    DAYS = portfolio['constants']['days']
     end_day = end_day if end_day else datetime.now().replace(hour=13, minute=0, second=0, microsecond=0) # maybe refactor, markets are from 9:30 - 16:00 EST / 6:30 - 13:00 PST # maybe refactor - add precautionary check here and below to see if datetime.now() is after 13h
-    start_day = start_day if start_day else end_day - timedelta(days=days)
-    stop_day = start_day + timedelta(days=days)
+    start_day = start_day if start_day else end_day - timedelta(days=DAYS)
+    stop_day = start_day + timedelta(days=DAYS)
     if (back_testing and not paper_trading) or (not back_testing and (stop_day < datetime.now() - timedelta(hours=back_running_allowance))): # back_running_allowance=11 for airs for some reason # 6:30am (new data arrives - except weekends & holidays) - 01:00pm previous day = 17.5 # assuming datetime input is always in 13:00:00 and run after market close of the stop_day # (stop_day.date() != datetime.now().date()) # maybe refactor here and below, allow 24 hours or more custom (especially if run update_portfolio_buy_and_sell_tickers() more than once per day after market hours as it is now or if account for running on weekends) # could also be more like in crypto.py or add full datetime comparison # here and below no need to check for (end_day.date() <= start_day.date()) since while loop won't execute (since stop_day is always > start_day will be greater than end_day)
         print("Error (backtesting and not paper trading) or back running")
         return ["Error", portfolio, None, None, None, None, None, None, None, None]
@@ -1137,7 +1132,7 @@ def check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, s
     # SHORT = False # possibly add short logic
     # get most exchange tickers listing
     # exchange_prices = exchange_client.get_all_tickers()
-    return ["Success", portfolio, days, end_day, start_day, stop_day, tickers_to_avoid, tickers_with_stock_splits, count, usa_holidays]
+    return ["Success", portfolio, DAYS, end_day, start_day, stop_day, tickers_to_avoid, tickers_with_stock_splits, count, usa_holidays]
 
 # Not merging run_portfolio_zr/rr into single function since even though it appears that sometimes only difference in algorithm functions is how to pick tickers there can be nuiances like if portfolio['constants']['up_down_move'] > 4: in run_portfolio_zr() and potentially more between portfolios
 # can make it run_portfolio_tr as well with tr_sell instead of zr_sell, 'Rating' instead of 'Zacks Rank', # maybe refactor and add error regarding start_day being before 2020-04-24 or 2020-05-08 since 05/08/2020 is first day with larger USA-listed stocks data (~4900 tickers) set, before that (04/24/2020 - 05/08/2020) it's smaller S&P 500 (505 tickers) data set, 04/24/2020 is first day with stock tickers data
@@ -1663,8 +1658,9 @@ def run_portfolio_sma_mm(portfolio, start_day=None, end_day=None, sma_mm_sell=Tr
     print("running run_portfolio_sma_mm()")
     # no need for, always trading: sma_mm_sell or (portfolio['balance']['usd'] >= portfolio['constants']['usd_invest_min'])
     UP_DOWN_MOVE = portfolio['constants']['up_down_move'] # refactor and add UP_MOVE, DOWN_MOVE = portfolio['constants']['up_down_move'] in terms of 20D, 50D, 200D ie 200 or [50,200] if multiple
-    if UP_DOWN_MOVE not in ["price-200D", "price-200D-sp500", "5D-8D-13D"]:
-        print("Error up/down move is not in list of allowed algorithms: " + "price-200D, price-200D-sp500, 5D-8D-13D")
+    sma_mm_algos = ["price-200D", "price-200D-sp500", "5D-8D-13D"]
+    if UP_DOWN_MOVE not in sma_mm_algos:
+        print("Error up/down move is not in list of allowed algorithms: " + str(sma_mm_algos))
         return portfolio
     success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_to_avoid, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
     if success_or_error == "Error":
@@ -1806,9 +1802,9 @@ def portfolio_calculate_roi(portfolio, open_positions=True, sold_positions=False
     else:
         return float("NaN")
 
-def sleep_until_30_min(paper_trading, paper_trading_on_used_account, portfolio_usd_value_negative_change_from_max_limit, portfolio_current_roi_restart, download_and_save_tickers_data): # maybe refactor to allow for different sleeping times (i.e. 30, 60 min) # maybe refactor name to sleep_until_30_min_while_trading() # , buying_disabled
+def sleep_until_30_min(paper_trading, paper_trading_on_used_account, portfolio_usd_value_negative_change_from_max_limit, portfolio_current_roi_restart, download_and_save_tickers_data, fmp_paid_data): # maybe refactor to allow for different sleeping times (i.e. 30, 60 min) # maybe refactor name to sleep_until_30_min_while_trading() # , buying_disabled
     time_to_sleep = (30.0 - datetime.now(eastern).minute) if (datetime.now(eastern).minute < 30) else (60.0 - datetime.now(eastern).minute) # max((60.0 - datetime.now(eastern).minute) % 30.0, 1) # maybe refactor logic (make simpler)
-    print("<< Sleeping " + str(time_to_sleep) + "min at " + str(datetime.now()) + ", paper trading: " + str(paper_trading) + ", paper trading on used account: " + str(paper_trading_on_used_account) + ", portfolio usd value (-)change from max limit: " + str(portfolio_usd_value_negative_change_from_max_limit) + ", portfolio current roi restart: " + str(portfolio_current_roi_restart) + ", download and save tickers data: " + str(download_and_save_tickers_data) + " >>") #  + ", buying disabled: " + str(buying_disabled) # maybe add back to shorten: str(datetime.now())[:19]) - should always be [:19] unless in ~8000 years or if timing format changes
+    print("<< Sleeping " + str(time_to_sleep) + "min at " + str(datetime.now()) + ", paper trading: " + str(paper_trading) + ", paper trading on used account: " + str(paper_trading_on_used_account) + ", portfolio usd value (-)change from max limit: " + str(portfolio_usd_value_negative_change_from_max_limit) + ", portfolio current roi restart: " + str(portfolio_current_roi_restart) + ", download and save tickers data: " + str(download_and_save_tickers_data) + ", fmp paid data: " + str(fmp_paid_data) + " >>") #  + ", buying disabled: " + str(buying_disabled) # maybe add back to shorten: str(datetime.now())[:19]) - should always be [:19] unless in ~8000 years or if timing format changes
     time.sleep(time_to_sleep*60.0) # not needed 30*60.0 - *60) # turning into seconds
 
 # maybe refactor, pause buying / terminate program
@@ -1919,7 +1915,7 @@ def portfolio_trading(portfolio, paper_trading=True, paper_trading_on_used_accou
                 else:
                     # df_tickers_interval_today = get_saved_tickers_data(date=todays_date.strftime('%Y-%m-%d'))
                     while df_tickers_interval_today.empty:
-                        sleep_until_30_min(paper_trading=paper_trading, paper_trading_on_used_account=paper_trading_on_used_account, portfolio_usd_value_negative_change_from_max_limit=portfolio_usd_value_negative_change_from_max_limit, portfolio_current_roi_restart=portfolio_current_roi_restart, download_and_save_tickers_data=download_and_save_tickers_data) # , buying_disabled=buying_disabled
+                        sleep_until_30_min(paper_trading=paper_trading, paper_trading_on_used_account=paper_trading_on_used_account, portfolio_usd_value_negative_change_from_max_limit=portfolio_usd_value_negative_change_from_max_limit, portfolio_current_roi_restart=portfolio_current_roi_restart, download_and_save_tickers_data=download_and_save_tickers_data, fmp_paid_data=fmp_paid_data) # , buying_disabled=buying_disabled
                         if todays_date.hour <= (datetime.now() - timedelta(hours=11)).hour: # implemented so that if no market data doesn't stop program from running normally # maybe refactor, 11 hours since if running on Friday next if statement might run on Saturday if data is not downloaded until 6am Saturday morning
                             break
                         df_tickers_interval_today = get_saved_tickers_data(date=todays_date.strftime('%Y-%m-%d'))
@@ -1933,7 +1929,7 @@ def portfolio_trading(portfolio, paper_trading=True, paper_trading_on_used_accou
                 twilio_message = _fetch_data(twilio_client.messages.create, params={'to': twilio_phone_to, 'from_': twilio_phone_from, 'body': "Q Trading @stocks #" + portfolio_account + ": " + ("Ticker data saved" if download_and_save_tickers_data else "") + ", run_portfolio executed, and portfolio saved for date: " + todays_date.strftime('%Y-%m-%d') + " on: " + str(datetime.now()) + " :)"}, error_str=" - Twilio msg error to: " + twilio_phone_to + " on: " + str(datetime.now()), empty_data=None)
             if (datetime.now(eastern).hour >= 9) and (datetime.now(eastern).hour < 16): # stocks: maybe refactor to get total time in seconds (from beginning of day) instead of like this, so can be more exact (i.e. start at 9:30am EST so no beforehours) # no afterhours trading since risky due to less liquidity, doesn't reflect normal market conditions # maybe refactor bug if run on Friday and data not downloaded until
                 if (datetime.now(eastern).hour == 9) and (datetime.now(eastern).minute < 30): # probably refactor and add check for stocks splits before market open, minor issue for now
-                    sleep_until_30_min(paper_trading=paper_trading, paper_trading_on_used_account=paper_trading_on_used_account, portfolio_usd_value_negative_change_from_max_limit=portfolio_usd_value_negative_change_from_max_limit, portfolio_current_roi_restart=portfolio_current_roi_restart, download_and_save_tickers_data=download_and_save_tickers_data) # maybe refactor, quick (and cheap in terms of processing power / logic) fix to avoid trading/using prices from less liquid beforehours trading
+                    sleep_until_30_min(paper_trading=paper_trading, paper_trading_on_used_account=paper_trading_on_used_account, portfolio_usd_value_negative_change_from_max_limit=portfolio_usd_value_negative_change_from_max_limit, portfolio_current_roi_restart=portfolio_current_roi_restart, download_and_save_tickers_data=download_and_save_tickers_data, fmp_paid_data=fmp_paid_data) # maybe refactor, quick (and cheap in terms of processing power / logic) fix to avoid trading/using prices from less liquid beforehours trading
                 print("<< " + str(datetime.now()) + ", paper trading: " + str(paper_trading) + ", paper trading on used account: " + str(paper_trading_on_used_account) + ", portfolio usd value (-)change from max limit: " + str(portfolio_usd_value_negative_change_from_max_limit) + ", portfolio current roi restart: " + str(portfolio_current_roi_restart) + " >>") #  + ", buying disabled: " + str(buying_disabled)
                 start_time = time.time()
                 if portfolio['constants']['type'] == 'sma_mm':
@@ -2030,9 +2026,9 @@ def portfolio_trading(portfolio, paper_trading=True, paper_trading_on_used_accou
                 save_portfolio_backup(portfolio)
                 time.sleep(240.0 - ((time.time() - start_time) % 240.0)) # every 4 minutes since algorithms are low latency and don't want to use up excess computing power especially if running alongside crypto
             else: # business day market closed hours
-                sleep_until_30_min(paper_trading=paper_trading, paper_trading_on_used_account=paper_trading_on_used_account, portfolio_usd_value_negative_change_from_max_limit=portfolio_usd_value_negative_change_from_max_limit, portfolio_current_roi_restart=portfolio_current_roi_restart, download_and_save_tickers_data=download_and_save_tickers_data) # , buying_disabled=buying_disabled
+                sleep_until_30_min(paper_trading=paper_trading, paper_trading_on_used_account=paper_trading_on_used_account, portfolio_usd_value_negative_change_from_max_limit=portfolio_usd_value_negative_change_from_max_limit, portfolio_current_roi_restart=portfolio_current_roi_restart, download_and_save_tickers_data=download_and_save_tickers_data, fmp_paid_data=fmp_paid_data) # , buying_disabled=buying_disabled
         else: # non-business days, # maybe refactor to 1 hour
-            sleep_until_30_min(paper_trading=paper_trading, paper_trading_on_used_account=paper_trading_on_used_account, portfolio_usd_value_negative_change_from_max_limit=portfolio_usd_value_negative_change_from_max_limit, portfolio_current_roi_restart=portfolio_current_roi_restart, download_and_save_tickers_data=download_and_save_tickers_data) # , buying_disabled=buying_disabled
+            sleep_until_30_min(paper_trading=paper_trading, paper_trading_on_used_account=paper_trading_on_used_account, portfolio_usd_value_negative_change_from_max_limit=portfolio_usd_value_negative_change_from_max_limit, portfolio_current_roi_restart=portfolio_current_roi_restart, download_and_save_tickers_data=download_and_save_tickers_data, fmp_paid_data=fmp_paid_data) # , buying_disabled=buying_disabled
 
 # as of 09/28/2020 changed portfolio_constants naming of file from (example) 100_100_15 to 100_-100_15
 def save_portfolio_backup(portfolio, remove_old_portfolio=False, date=None, **params): # can add logic for different types of portfolio i.e. rr with different kinds of parameters i.e. different up and down moves
