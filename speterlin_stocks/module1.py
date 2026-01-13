@@ -53,7 +53,7 @@ __all__ = [
     # "get_tickers_with_stock_splits_in_day_yfinance",
     # "get_tickers_with_stock_splits_in_period_yfinance",
     # "get_exchange_rates_exchangerate",
-    # "get_ticker_data_detailed_gfinance",
+    "get_ticker_data_detailed_gfinance",
     # "openai_functions", # array of functions
     # "should_I_buy_the_stock_openai",
     "should_I_buy_the_stock_google_gemini_pro",
@@ -875,18 +875,19 @@ def alpaca_trade_ticker(ticker, side, usd_invest=None, quantity=None, price=None
         'limit_price': round(price, 2), # sub-penny increment not allowed
         'time_in_force': 'gtc'
     }, error_str=" - Alpaca trade execution error for ticker: " + str(ticker) + ", " + str(side) + ", quantity: " + str(quantity) + ", limit_price: " + str(price) + " on: " + str(datetime.now()), empty_data={})
-    if not order: # usually due to minimum amount issue, maybe refactor and raise error
+    if not order or (order.status == 'rejected'): # usually due to minimum amount issue, maybe refactor and raise error # could refactor here and below make it simple: 'Filled' if order.status=='filled' else 'Not Filled' if order.status=='accepted' else 'Partially Filled' if order.status=='partially filled' else '~Filled'
         return [quantity, price, {}, [], "ATrade Error"] # maybe refactor 'ATrade Error' to 'ATrade error' to match casing of 'Not filled', 'Partially filled'
-    open_orders = [open_order for open_order in _fetch_data(alpaca_api.list_orders, params={'status': 'open', 'nested': True}, error_str=" - Alpaca open orders error on: " + str(datetime.now()), empty_data=[]) if open_order.symbol == ticker and datetime.fromtimestamp(datetime.timestamp(open_order.created_at)) <= (datetime.now() + timedelta(minutes=1))] # maybe refactor minutes=1, depends on processing and on if implement open_time # datetime.fromtimestamp(datetime.timestamp() faster than open_order.created_at.to_pydatetime() and using datetime.utcnow() # show nested multi-leg orders # limit=100,
-    if not float(order.filled_qty) and not open_orders: # if both of these conditions fail after order went through most likely means that more processing time (on Alpaca servers) is needed to process open_order (unlikely but possible that open_order was created and executed in the span of ~4 lines of code)
+    open_orders_for_ticker_at_present = [open_order for open_order in _fetch_data(alpaca_api.list_orders, params={'status': 'open', 'nested': True}, error_str=" - Alpaca open orders error on: " + str(datetime.now()), empty_data=[]) if (open_order.symbol == ticker) and ((datetime.now() - timedelta(minutes=1)) <= datetime.fromtimestamp(datetime.timestamp(open_order.created_at)) <= (datetime.now() + timedelta(minutes=1)))] # maybe refactor minutes=1, depends on processing and on if implement open_time # datetime.fromtimestamp(datetime.timestamp() faster than open_order.created_at.to_pydatetime() and using datetime.utcnow() # show nested multi-leg orders # limit=100,
+    if not float(order.filled_qty) and not open_orders_for_ticker_at_present: # if both of these conditions fail after order went through most likely means that more processing time (on Alpaca servers) is needed to process open_order (unlikely but possible that open_order was created and executed in the span of ~4 lines of code)
+        print("Potential lag in open order creation - waiting " + str(open_time) + " seconds and checking again for open orders after order submitted")
         time.sleep(open_time)
-        open_orders = [open_order for open_order in _fetch_data(alpaca_api.list_orders, params={'status': 'open', 'nested': True}, error_str=" - Alpaca open orders error on: " + str(datetime.now()), empty_data=[]) if open_order.symbol == ticker and datetime.fromtimestamp(datetime.timestamp(open_order.created_at)) <= (datetime.now() + timedelta(minutes=1))]
-    trade_notes = 'Filled' if (float(order.filled_qty) and not open_orders) else 'Not filled' if (not float(order.filled_qty) and open_orders and not float(open_orders['symbol' == ticker].filled_qty)) else 'Partially filled' if ((float(order.filled_qty) and open_orders) or (open_orders and float(open_orders['symbol' == ticker].filled_qty))) else "~Filled" # refactor "Not Filled" / "Partially filled" to something like (open_orders and not float(open_orders[0].filled_qty)) / (open_orders and float(open_orders[0].filled_qty)) # (quantity - float(order.filled_qty) == 0), ((quantity - float(order.filled_qty) == quantity) and any(open_orders)), any(open_orders) # '~Filled', if (order.status != 'accepted') else
+        open_orders_for_ticker_at_present = [open_order for open_order in _fetch_data(alpaca_api.list_orders, params={'status': 'open', 'nested': True}, error_str=" - Alpaca open orders error on: " + str(datetime.now()), empty_data=[]) if (open_order.symbol == ticker) and ((datetime.now() - timedelta(minutes=1)) <= datetime.fromtimestamp(datetime.timestamp(open_order.created_at)) <= (datetime.now() + timedelta(minutes=1)))]
+    trade_notes = 'Filled' if (float(order.filled_qty) and not open_orders_for_ticker_at_present) else 'Not filled' if (not float(order.filled_qty) and open_orders_for_ticker_at_present and not float(open_orders_for_ticker_at_present[0].filled_qty)) else 'Partially filled' if ((float(order.filled_qty) and open_orders_for_ticker_at_present) or (open_orders_for_ticker_at_present and float(open_orders_for_ticker_at_present[0].filled_qty))) else "~Filled" # ()'symbol' == ticker)->[0] since already filtered above if len>1 (which is an alpaca error) first instance should be the right open order # refactor "Not Filled" / "Partially filled" to something like (open_orders_for_ticker_at_present and not float(open_orders_for_ticker_at_present[0].filled_qty)) / (open_orders_for_ticker_at_present and float(open_orders_for_ticker_at_present[0].filled_qty)) # (quantity - float(order.filled_qty) == 0), ((quantity - float(order.filled_qty) == quantity) and any(open_orders_for_ticker_at_present))
     message_body = "Q Trading @stocks #" + portfolio_account + ": " + ticker + " " + side + " at price $" + str(price) + " and quantity " + str(quantity) + ", " + str(other_notes) + ", " + trade_notes + (" :)" if trade_notes == "Filled" else " :/" if trade_notes == "Partially filled" else " :(") + ", at: " + str(datetime.now())
     color_start, color_end = ["\033[92m", "\033[0m"] if trade_notes in ["Filled", "~Filled"] else ["\033[33m", "\033[0m"] if trade_notes == "Partially filled" else ["\033[91m", "\033[0m"] # ["\033[94m", "\033[0m"] if paper_trading else # blue for paper_trading, maybe refactor and add other color to function calls # green yellow red # last condition is if "Not filled" or "ATrade Error"
-    print("executed alpaca_trade_ticker()\n" + color_start + message_body + color_end + "\n\033[1mOrder:\033[0m " + str(order) + "\n\033[1mOpen orders:\033[0m" + str(open_orders))
+    print("executed alpaca_trade_ticker()\n" + color_start + message_body + color_end + "\n\033[1mOrder:\033[0m " + str(order) + "\n\033[1mOpen orders for ticker at present:\033[0m" + str(open_orders_for_ticker_at_present))
     twilio_message = _fetch_data(twilio_client.messages.create, params={'to': twilio_phone_to, 'from_': twilio_phone_from, 'body': message_body}, error_str=" - Twilio msg error to: " + twilio_phone_to + " on: " + str(datetime.now()), empty_data=None)
-    return [quantity, price, order, open_orders, trade_notes] # maybe refactor and add position, price (since price often not the same as limit price - usually lower for buy, higher for sell), but complicated since order usually not filled immediately # can add check if order['fills'] 'qty'(s) equal quantity
+    return [quantity, price, order, open_orders_for_ticker_at_present, trade_notes] # maybe refactor and add position, price (since price often not the same as limit price - usually lower for buy, higher for sell), but complicated since order usually not filled immediately # can add check if order['fills'] 'qty'(s) equal quantity
 
 def get_alpaca_assets(alpaca_account, alpaca_open_orders=[]):
     print("getting alpaca assets")
@@ -1055,7 +1056,7 @@ def update_portfolio_buy_and_sell_tickers(portfolio, tickers_to_buy, tickers_to_
     return portfolio
 
 def get_sp500_ranked_tickers_by_slickcharts() :
-    resp = requests.get('https://www.slickcharts.com/sp500', headers=headers, verify=False)
+    resp = requests.get('https://www.slickcharts.com/sp500', headers=headers) # , verify=False
     soup = bs.BeautifulSoup(resp.text, 'lxml')
     table = soup.find('table', {'class': 'table table-hover table-borderless table-sm'})
     df_tickers = pd.DataFrame(columns = ["Company Name", "S&P 500 Rank", "Weight", "Price", "Price Change"]).astype({'Company Name': 'object','S&P 500 Rank': 'float64', 'Weight': 'float64', 'Price': 'float64', 'Price Change': 'float64'})
@@ -1165,12 +1166,12 @@ def run_portfolio_zr(portfolio, start_day=None, end_day=None, zr_sell=True, pape
                     tickers_to_buy, tickers_to_sell = [], [] # Counter(), Counter()
                     for ticker in df_tickers_interval_stop.index:
                         try:
-                            if (ticker not in portfolio['open'].index) and (df_tickers_interval_stop.loc[ticker, 'Zacks Rank'] < 3) and (df_tickers_interval_start.loc[ticker, 'Zacks Rank'] >= 3): # care if ticker has just turned to buy # convenient since if 'Zacks Rank' is None conditional expression returns False instead of returning an error and continues, much faster
+                            if (ticker not in portfolio['open'].index) and (df_tickers_interval_stop.loc[ticker, 'Zacks Rank'] and (df_tickers_interval_stop.loc[ticker, 'Zacks Rank'] < 3)) and (df_tickers_interval_start.loc[ticker, 'Zacks Rank'] and (df_tickers_interval_start.loc[ticker, 'Zacks Rank'] >= 3)): # care if ticker has just turned to buy - Zacks Rank (1='Strong Buy', 3='Hold', 5='Strong Sell') # convenient since if 'Zacks Rank' is None conditional expression returns False instead of returning an error and continues, much faster
                                 rank_change = df_tickers_interval_start.loc[ticker, 'Zacks Rank'] - df_tickers_interval_stop.loc[ticker, 'Zacks Rank'] # can also make it rating_change if using tr 'Rating'
                                 if rank_change >= UP_MOVE:
                                     tickers_to_buy.append([ticker, rank_change]) # tickers_to_buy[ticker] = df_tickers_interval_stop.loc[ticker, 'Zacks Rank'] - df_tickers_interval_start.loc[ticker, 'Zacks Rank']
-                            elif zr_sell and (ticker in portfolio['open'].index) and (portfolio['open'].loc[ticker, 'trade_notes'] in ["Filled", "~Filled", None]) and (df_tickers_interval_stop.loc[ticker, 'Zacks Rank'] > 3): # don't care if ticker has just turned to sell or has been sell for a while: if (df_tickers_interval_stop.loc[ticker, 'Zacks Rank'] > 3) and (df_tickers_interval_start.loc[ticker, 'Zacks Rank'] <= 3):
-                                rank_change = df_tickers_interval_start.loc[ticker, 'Zacks Rank'] - df_tickers_interval_stop.loc[ticker, 'Zacks Rank'] # can also make it rating_change if using tr 'Rating'
+                            elif zr_sell and (ticker in portfolio['open'].index) and (portfolio['open'].loc[ticker, 'trade_notes'] in ["Filled", "~Filled", None]) and (df_tickers_interval_stop.loc[ticker, 'Zacks Rank'] and (df_tickers_interval_stop.loc[ticker, 'Zacks Rank'] > 3)): # don't care if ticker has just turned to sell or has been sell for a while: if (df_tickers_interval_stop.loc[ticker, 'Zacks Rank'] > 3) and (df_tickers_interval_start.loc[ticker, 'Zacks Rank'] <= 3):
+                                rank_change = (df_tickers_interval_start.loc[ticker, 'Zacks Rank'] if df_tickers_interval_start.loc[ticker, 'Zacks Rank'] else float("NaN")) - df_tickers_interval_stop.loc[ticker, 'Zacks Rank'] # can also make it rating_change if using tr 'Rating'
                                 if rank_change <= DOWN_MOVE:
                                     tickers_to_sell.append([ticker, rank_change]) # tickers_to_sell[ticker] = df_tickers_interval_stop.loc[ticker, 'Zacks Rank'] - df_tickers_interval_start.loc[ticker, 'Zacks Rank']
                         except Exception as e:
@@ -1595,7 +1596,7 @@ def senate_timestamps_and_tickers_inflows_and_outflows_by_month_for_stocks(stock
             df = pd.concat([df, temp_df], axis=0)
         except:
             print(f'No Data for {ticker}')
-    df = df.groupby([pd.Grouper(freq='M'),'symbol'])[['amount_fixed']].sum()
+    df = df.groupby([pd.Grouper(freq='ME'),'symbol'])[['amount_fixed']].sum() # Warning 2026-01-11: FutureWarning: 'M' is deprecated and will be removed in a future version, please use 'ME' instead
     df['rank'] = df.groupby(level=0)['amount_fixed'].transform(lambda x: x.rank(ascending=False))
     return df
 
@@ -1930,7 +1931,7 @@ def portfolio_trading(portfolio, paper_trading=True, paper_trading_on_used_accou
             if (datetime.now(eastern).hour >= 9) and (datetime.now(eastern).hour < 16): # stocks: maybe refactor to get total time in seconds (from beginning of day) instead of like this, so can be more exact (i.e. start at 9:30am EST so no beforehours) # no afterhours trading since risky due to less liquidity, doesn't reflect normal market conditions # maybe refactor bug if run on Friday and data not downloaded until
                 if (datetime.now(eastern).hour == 9) and (datetime.now(eastern).minute < 30): # probably refactor and add check for stocks splits before market open, minor issue for now
                     sleep_until_30_min(paper_trading=paper_trading, paper_trading_on_used_account=paper_trading_on_used_account, portfolio_usd_value_negative_change_from_max_limit=portfolio_usd_value_negative_change_from_max_limit, portfolio_current_roi_restart=portfolio_current_roi_restart, download_and_save_tickers_data=download_and_save_tickers_data) # maybe refactor, quick (and cheap in terms of processing power / logic) fix to avoid trading/using prices from less liquid beforehours trading
-                print("<< " + str(datetime.now()) + ", paper trading: " + str(paper_trading) + ", paper trading on used account: " + str(paper_trading_on_used_account) + ", portfolio usd value (-)change from max limit: " + str(portfolio_usd_value_negative_change_from_max_limit) + ", portfolio current roi restart: " + str(portfolio_current_roi_restart) + " >>") #  + ", buying disabled: " + str(buying_disabled)
+                print("<< " + str(datetime.now()) + ", paper trading: " + str(paper_trading) + ", paper trading on used account: " + str(paper_trading_on_used_account) + ", portfolio usd value (-)change from max limit: " + str(portfolio_usd_value_negative_change_from_max_limit) + ", portfolio current roi restart: " + str(portfolio_current_roi_restart) + ", download and save tickers data: " + str(download_and_save_tickers_data) + " >>") #  + ", buying disabled: " + str(buying_disabled)
                 start_time = time.time()
                 if portfolio['constants']['type'] == 'sma_mm':
                     todays_date = datetime.now()
