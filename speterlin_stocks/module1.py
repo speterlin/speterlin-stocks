@@ -52,7 +52,7 @@ __all__ = [
     # "get_ticker_data_detailed_yfinance",
     # "get_tickers_with_stock_splits_in_day_yfinance",
     # "get_tickers_with_stock_splits_in_period_yfinance",
-    # "get_exchange_rates_exchangerate",
+    "get_exchange_rates_exchangerate",
     "get_ticker_data_detailed_gfinance",
     # "openai_functions", # array of functions
     # "should_I_buy_the_stock_openai",
