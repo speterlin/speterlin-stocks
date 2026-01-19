@@ -92,8 +92,8 @@ portfolio_sma_mm_test_3 = {
     'sold': pd.DataFrame(columns=['ticker', 'position', 'buy_date', 'buy_price', 'balance', 'sell_date', 'sell_price', 'roi', 'fmp_24h_vol', 'gtrends_15d', 'rank_rise_d', 'tsl_max_price', 'trade_notes', 'other_notes']).astype({'ticker': 'object', 'position': 'object', 'buy_date': 'datetime64[ns]', 'buy_price': 'float64', 'balance': 'float64', 'sell_date': 'datetime64[ns]', 'sell_price': 'float64', 'roi': 'float64', 'fmp_24h_vol': 'float64', 'gtrends_15d': 'float64', 'rank_rise_d': 'float64', 'tsl_max_price': 'float64', 'trade_notes': 'object', 'other_notes': 'object'})
 }
 
-# DECLARE tickers_with_stock_splits, tickers_to_avoid, senate_timestamps_and_tickers_inflows_and_outflows and BACKTEST a single algorithm with different parameters on a time period like in github.com/speterlin/quant-trading README.md#Backtesting in Python virtual environment shell (or differnet algorithms with set parameters like below), OR BACKTEST a single algorithm with set parameters on a time period like below
-paper_trading, back_testing, add_pauses_to_avoid_unsolved_error = True, True, {'engaged': True, 'time': 120, 'days': 60} # {'engaged': False, 'time': 420, 'days': 20}
+# DECLARE tickers_with_stock_splits, tickers_to_avoid (and senate_timestamps_and_tickers_inflows_and_outflows if running that algo) and BACKTEST a single algorithm with different parameters on a time period like in github.com/speterlin/quant-trading README.md#Backtesting in Python virtual environment shell (or different algorithms with set parameters like below), OR BACKTEST a single algorithm with set parameters on a time period like below
+paper_trading, back_testing, add_pauses_to_avoid_unsolved_error = True, True, {'engaged': True, 'time': 60, 'days': 5} # days naming reflects correct logic for all portfolio types except random_sp500 and senate_trading since back_testing increments are stop_day = stop_day + timedelta(days=DAYS) vs. stop_day = stop_day + timedelta(days=1) # {'engaged': False, 'time': 420, 'days': 20}
 portfolios = {
     'zr': portfolio_zr_test,
     'rr': portfolio_rr_test,
@@ -107,11 +107,11 @@ portfolios = {
     'sma_mm': {portfolio_sma_mm_test['constants']['up_down_move']: portfolio_sma_mm_test, portfolio_sma_mm_test_2['constants']['up_down_move']: portfolio_sma_mm_test_2, portfolio_sma_mm_test_3['constants']['up_down_move']: portfolio_sma_mm_test_3}
 }
 
-# RUN portfolios
 tickers_with_stock_splits = stocks.get_tickers_with_stock_splits_fmp(start_day=start_day)
 df_tickers_end_day = stocks.get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
 tickers_to_avoid = stocks.get_tickers_to_avoid(df_tickers_end_day, end_day)
 
+# RUN portfolios
 for portfolio_name, portfolio in portfolios.items():
     if portfolio_name == 'sma_mm':
         for portfolio_x_name, portfolio_x in portfolio.items(): # portfolio is a list
@@ -138,15 +138,15 @@ for portfolio_name, portfolio in portfolios.items():
         print(portfolio_name + ", USD Value: " + str(portfolio_usd_value) + ", USD Value Growth: " + str(portfolio_usd_value_growth))
 
 # RUN single portfolio
-portfolio_zr_test = stocks.run_portfolio(portfolio=portfolio_zr_test, start_day=start_day, end_day=end_day, paper_trading=paper_trading, back_testing=back_testing, add_pauses_to_avoid_unsolved_error=add_pauses_to_avoid_unsolved_error)
+portfolio_random_sp500_test = stocks.run_portfolio(portfolio=portfolio_random_sp500_test, start_day=start_day, end_day=end_day, paper_trading=paper_trading, back_testing=back_testing, add_pauses_to_avoid_unsolved_error=add_pauses_to_avoid_unsolved_error, tickers_with_stock_splits=tickers_with_stock_splits, tickers_to_avoid=tickers_to_avoid)
 
 # CHECK ROI of single portfolio
-portfolio_usd_value = portfolio_zr_test['balance']['usd']
-for ticker in portfolio_zr_test['open'].index:
-    portfolio_usd_value += portfolio_zr_test['open'].loc[ticker, 'current_price']*portfolio_zr_test['open'].loc[ticker, 'balance']
+portfolio_usd_value = portfolio_random_sp500_test['balance']['usd']
+for ticker in portfolio_random_sp500_test['open'].index:
+    portfolio_usd_value += portfolio_random_sp500_test['open'].loc[ticker, 'current_price']*portfolio_random_sp500_test['open'].loc[ticker, 'balance']
 
-portfolio_usd_value_growth = (portfolio_usd_value - portfolio_zr_test['constants']['start_balance']['usd']) / portfolio_zr_test['constants']['start_balance']['usd']
+portfolio_usd_value_growth = (portfolio_usd_value - portfolio_random_sp500_test['constants']['start_balance']['usd']) / portfolio_random_sp500_test['constants']['start_balance']['usd']
 
 # INSPECT OUTCOME of single portfolio
-portfolio_zr_test['sold'].sort_values('roi', inplace=False, ascending=False)[['ticker', 'buy_date', 'buy_price', 'balance', 'rank_rise_d', 'sell_date', 'sell_price', 'roi', 'other_notes']]
-portfolio_zr_test['open'].sort_values('current_roi', inplace=False, ascending=False)[['buy_date', 'buy_price', 'balance', 'rank_rise_d', 'current_date', 'current_price', 'current_roi', 'other_notes']]
+portfolio_random_sp500_test['sold'].sort_values('roi', inplace=False, ascending=False)[['ticker', 'buy_date', 'buy_price', 'balance', 'rank_rise_d', 'sell_date', 'sell_price', 'roi', 'other_notes']]
+portfolio_random_sp500_test['open'].sort_values('current_roi', inplace=False, ascending=False)[['buy_date', 'buy_price', 'balance', 'rank_rise_d', 'current_date', 'current_price', 'current_roi', 'other_notes']]
