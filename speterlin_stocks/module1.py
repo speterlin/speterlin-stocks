@@ -183,7 +183,7 @@ def trendline(data, order=1, reverse_to_ascending=False):
 def get_zacks_data(ticker=None):
     # zacks rank, can also do motley fool, found from github.com/janlukasschroeder/zacks-api
     # proxies = {'http':'http://localhost:port','https':'http://localhost:port'}
-    resp = requests.get("https://quote-feed.zacks.com/?t=" + ticker, headers=headers, verify=False) # proxies=proxies, #) # , verify=False # can add installing openssl: https://stackoverflow.com/questions/51768496/why-do-https-requests-produce-ssl-certificate-verify-failed-error, https://www.google.com/search?q=browser+request+vs.+python+requests.get&oq=browser+request+vs.+python+requests.get&aqs=chrome..69i57.8276j0j7&sourceid=chrome&ie=UTF-8
+    resp = requests.get("https://quote-feed.zacks.com/?t=" + ticker, headers=headers) # , verify=False # proxies=proxies, #) # , verify=False # can add installing openssl: https://stackoverflow.com/questions/51768496/why-do-https-requests-produce-ssl-certificate-verify-failed-error, https://www.google.com/search?q=browser+request+vs.+python+requests.get&oq=browser+request+vs.+python+requests.get&aqs=chrome..69i57.8276j0j7&sourceid=chrome&ie=UTF-8
     data = resp.json()
     return data
 
@@ -1335,7 +1335,7 @@ def run_portfolio_mmtv(portfolio, start_day=None, end_day=None, mmtv_sell=True, 
                             interval_day = interval_day + timedelta(days=1)
                             while interval_day.weekday() > 4 or (interval_day.replace(hour=0, minute=0, second=0, microsecond=0) in usa_holidays):
                                 interval_day = interval_day + timedelta(days=1)
-                        print(ticker + " has trading volumes " + str(trading_volumes_since_interval) + " from " + str(interval_start_date) + " to " + str(stop_day))
+                        # print(ticker + " has trading volumes " + str(trading_volumes_since_interval) + " from " + str(interval_start_date) + " to " + str(stop_day))
                         trading_volumes_since_interval_filtered = [trading_volume for trading_volume in trading_volumes_since_interval if trading_volume]
                         mean_trading_volume_since_interval = mean(trading_volumes_since_interval_filtered) if trading_volumes_since_interval_filtered else float("NaN")
                         if (ticker not in portfolio['open'].index) and (trading_volume_stop_day > mean_trading_volume_since_interval): # rr_buy and
