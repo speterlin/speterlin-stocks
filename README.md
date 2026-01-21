@@ -147,3 +147,7 @@ portfolios = {
 ```python
 twilio_message = stocks._fetch_data(stocks.twilio_client.messages.create, params={'to': stocks.twilio_phone_to, 'from_': stocks.twilio_phone_from, 'body': "Q Trading @stocks #" + stocks.portfolio_account + ": running on " + str(datetime.now()) + " :)"}, error_str=" - Twilio msg error to: " + stocks.twilio_phone_to + " on: " + str(datetime.now()), empty_data=None)
 ```
+
+## Disclaimer
+
+This package is for educational/research purposes only. Not financial advice.
