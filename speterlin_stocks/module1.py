@@ -79,7 +79,7 @@ __all__ = [
     # "get_sp500_ranked_tickers_by_marketbeat",
     "run_portfolio",
     "check_for_basic_errors_and_set_general_params_for_run_portfolio",
-    "run_portfolio_zr",
+    "run_portfolio_fmpr",
     "run_portfolio_rr",
     "run_portfolio_tilupccu",
     "run_portfolio_mmtv",
@@ -682,15 +682,16 @@ def save_usa_alpaca_tickers_fmp_or_gf_data(date, fmp_paid_data=False): # maybe r
             time.sleep(1*60)
         start_time = time.time()
         try:
+            zacks_data = _fetch_data(get_zacks_data, params={'ticker': ticker}, error_str=" - No Zacks Data for ticker: " + ticker + " on: " + str(datetime.now()), empty_data = {})
+            if ticker not in zacks_data or (('source' not in zacks_data[ticker]) and ('error' in zacks_data[ticker] and zacks_data[ticker]['error'] == 'true')): # 'market_data' not in ticker_data or not ticker_data['market_data']['market_cap']['usd']: # remove granular from error_str
+                print("Error retreiving zacks data for ticker: " + ticker + " on date: " + datetime.now().strftime('%Y-%m-%d'))
+                zacks_rank, zacks_updated_at = float("NaN"), None # float("NaN") for better processing speeds in run_portfolio_zr, when comparing None to float() returns error but when compare NaN to float() its ok, also messes with dtypes (converts dtype to object) when input None into float64 (or other non-object column) column (not sure why it shouldn't based on documentation - missing data converted to column's dtype - but on 08/07/2020 it did)
+            else:
+                zacks_rank, zacks_updated_at = float(zacks_data[ticker]['zacks_rank'] if ('zacks_rank' in zacks_data[ticker]) and zacks_data[ticker]['zacks_rank'] else "NaN"), pd.to_datetime(zacks_data[ticker]['updated'])
             if fmp_paid_data:
-                ticker_data_detailed = _fetch_data(get_ticker_data_detailed_fmp, params={'ticker': ticker}, error_str=" - No ticker data detailed FMP for ticker: " + ticker + " on: " + str(datetime.now()), empty_data={}) # , zacks_data = _fetch_data(get_zacks_data, params={'ticker': ticker}, error_str=" - No Zacks Data for ticker: " + ticker + " on: " + str(datetime.now()), empty_data = {}) # _fetch_data(get_ticker_data_detailed_gfinance, params={'ticker': ticker, 'exchange': asset.exchange}, error_str=" - No ticker data detailed gfinance for ticker: " + ticker + " on exchange: " + asset.exchange + " on: " + str(datetime.now()), empty_data={})
+                ticker_data_detailed = _fetch_data(get_ticker_data_detailed_fmp, params={'ticker': ticker}, error_str=" - No ticker data detailed FMP for ticker: " + ticker + " on: " + str(datetime.now()), empty_data={}) # _fetch_data(get_ticker_data_detailed_gfinance, params={'ticker': ticker, 'exchange': asset.exchange}, error_str=" - No ticker data detailed gfinance for ticker: " + ticker + " on exchange: " + asset.exchange + " on: " + str(datetime.now()), empty_data={})
                 if not ticker_data_detailed:
                     continue
-                # if ticker not in zacks_data or (('source' not in zacks_data[ticker]) and ('error' in zacks_data[ticker] and zacks_data[ticker]['error'] == 'true')): # 'market_data' not in ticker_data or not ticker_data['market_data']['market_cap']['usd']: # remove granular from error_str
-                #     print("Error retreiving zacks data for ticker: " + ticker + " on date: " + datetime.now().strftime('%Y-%m-%d'))
-                #     zacks_rank, zacks_updated_at = float("NaN"), None # float("NaN") for better processing speeds in run_portfolio_zr, when comparing None to float() returns error but when compare NaN to float() its ok, also messes with dtypes (converts dtype to object) when input None into float64 (or other non-object column) column (not sure why it shouldn't based on documentation - missing data converted to column's dtype - but on 08/07/2020 it did)
-                # else:
-                #     zacks_rank, zacks_updated_at = float(zacks_data[ticker]['zacks_rank'] if ('zacks_rank' in zacks_data[ticker]) and zacks_data[ticker]['zacks_rank'] else "NaN"), pd.to_datetime(zacks_data[ticker]['updated'])
                 # if None in [ticker_data_detailed['price']['marketCap'], ticker_data_detailed['price']['regularMarketPrice'], ticker_data_detailed['price']['regularMarketVolume'], ticker_data_detailed['defaultKeyStatistics']['trailingEps'], ticker_data_detailed['defaultKeyStatistics']['priceToBook']]:
                     # continue
                 # maybe add 'bid', 'sharesOutstanding', something regarding Sales/Revenue like ['defaultKeyStatistics']['enterpriseToRevenue'], something regarding ratings trend like ['recommendationTrend']['trend'], something regarding liquidity like current ratio, ['defaultKeyStatistics']['profitMargins'] # maybe take out 'eps' or 'p/e' one can be derived from the other and add (5 yr expected to PEG), 'ev/ebitda' since issue with ev value (compared to Yahoo Finance) # useful values from finance.yahoo.com/quote/' + ticker: '1y target EST', 'Earnings Date', 'Avg. Volume', "Day's Range", might be able to get more values like D/E and P/FCF in javascript section of page # not using Yahoo Finance EV since it is a quite a bit larger than TradingView
@@ -742,8 +743,8 @@ def save_usa_alpaca_tickers_fmp_or_gf_data(date, fmp_paid_data=False): # maybe r
                     None, # ticker_data_detailed['defaultKeyStatistics']['heldPercentInsiders'] if ('heldPercentInsiders' in ticker_data_detailed['defaultKeyStatistics']) else float("NaN"), # ['raw'] if ticker_data_detailed['defaultKeyStatistics']['heldPercentInsiders'] else float("NaN")
                     ticker_data_detailed['rating'][0]['ratingScore'] if (ticker_data_detailed['rating'] and 'ratingScore' in ticker_data_detailed['rating'][0]) else float("NaN"),
                     pd.to_datetime(ticker_data_detailed['rating'][0]['date']) if 'date' in ticker_data_detailed['rating'][0] else None,
-                    None, # zacks_rank, # , #
-                    None # zacks_updated_at # , #
+                    zacks_rank, # None, # , #
+                    zacks_updated_at # None # , #
                 ]
             else:
                 exchange = asset.exchange
@@ -751,7 +752,7 @@ def save_usa_alpaca_tickers_fmp_or_gf_data(date, fmp_paid_data=False): # maybe r
                 if not ticker_data_detailed:
                     continue
                 df_usa_alpaca_tickers_fmp_or_gf_ms_zr_data.loc[ticker,
-                    ['Name (Alpaca)', 'ID (Alpaca)', 'Exchange (Alpaca)', 'Shortable (Alpaca)', 'Easy to Borrow (Alpaca)', 'Class (Alpaca)', 'Market Cap', 'CEO', 'Website', '# Employees', 'Location', 'Last', 'Volume', 'P/E (TTM)', 'Basic EPS (TTM)', 'Div Yield (FY)', 'Day range', 'Year range'] # maybe add regex search for words before 'conglomerate'|'holding company'|'company' to get 'Sector', 'Industry'
+                    ['Name (Alpaca)', 'ID (Alpaca)', 'Exchange (Alpaca)', 'Shortable (Alpaca)', 'Easy to Borrow (Alpaca)', 'Class (Alpaca)', 'Market Cap', 'CEO', 'Website', '# Employees', 'Location', 'Last', 'Volume', 'P/E (TTM)', 'Basic EPS (TTM)', 'Div Yield (FY)', 'Day range', 'Year range', 'Zacks Rank', 'Zacks Updated At'] # maybe add regex search for words before 'conglomerate'|'holding company'|'company' to get 'Sector', 'Industry'
                 ] = [
                     asset.name, asset.id, asset.exchange, asset.shortable, asset.easy_to_borrow, asset.__getattr__('class'),
                     ticker_data_detailed['Market cap'] if 'Market cap' in ticker_data_detailed else float("NaN"),
@@ -765,7 +766,9 @@ def save_usa_alpaca_tickers_fmp_or_gf_data(date, fmp_paid_data=False): # maybe r
                     ticker_data_detailed['EPS (TTM)'] if 'EPS (TTM)' in ticker_data_detailed else float("NaN"),
                     ticker_data_detailed['Dividend yield'] if 'Dividend yield' in ticker_data_detailed else float("NaN"),
                     ticker_data_detailed['Day range'] if 'Day range' in ticker_data_detailed else None,
-                    ticker_data_detailed['Year range'] if 'Year range' in ticker_data_detailed else None
+                    ticker_data_detailed['Year range'] if 'Year range' in ticker_data_detailed else None,
+                    zacks_rank, # None, # , #
+                    zacks_updated_at # None # , #
                 ]
         except Exception as e:
             print(str(e) + " - No (or issue with) ticker data detailed " + ("FMP" if fmp_paid_data else "Google Finance") + " for ticker: " + ticker + " on exchange: " + asset.exchange + " on: " + str(datetime.now()) + ", Execution time: " + str(time.time() - start_time)) # or zacks data
@@ -1086,8 +1089,8 @@ def get_sp500_ranked_tickers_by_marketbeat():
 def run_portfolio(portfolio, **params): # call portfolio = run_portfolio(portfolio, **params) for all functions below, if pass paper_trading=True in run_portfolio() params should pick it up and treat as a normal parameter in run_portfolio_rr etc # start_day=None, end_day=None, algo_sell=True, paper_trading=True, back_testing=False, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 240, 'days': 15}
     if portfolio['constants']['type'] == 'rr':
         portfolio = run_portfolio_rr(portfolio, **params) # start_day=start_day, end_day=end_day, rr_sell=algo_sell, paper_trading=paper_trading, back_testing=back_testing, add_pauses_to_avoid_unsolved_error=add_pauses_to_avoid_unsolved_error
-    elif portfolio['constants']['type'] == 'zr':
-        portfolio = run_portfolio_zr(portfolio, **params)
+    elif portfolio['constants']['type'] == 'fmpr':
+        portfolio = run_portfolio_fmpr(portfolio, **params)
     elif portfolio['constants']['type'] == 'tilupccu':
         portfolio = run_portfolio_tilupccu(portfolio, **params)
     elif portfolio['constants']['type'] == 'mmtv':
@@ -1135,10 +1138,10 @@ def check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, s
     # exchange_prices = exchange_client.get_all_tickers()
     return ["Success", portfolio, DAYS, end_day, start_day, stop_day, tickers_to_avoid, tickers_with_stock_splits, count, usa_holidays]
 
-# Not merging run_portfolio_zr/rr into single function since even though it appears that sometimes only difference in algorithm functions is how to pick tickers there can be nuiances like if portfolio['constants']['up_down_move'] > 4: in run_portfolio_zr() and potentially more between portfolios
-# can make it run_portfolio_tr as well with tr_sell instead of zr_sell, 'Rating' instead of 'Zacks Rank', # maybe refactor and add error regarding start_day being before 2020-04-24 or 2020-05-08 since 05/08/2020 is first day with larger USA-listed stocks data (~4900 tickers) set, before that (04/24/2020 - 05/08/2020) it's smaller S&P 500 (505 tickers) data set, 04/24/2020 is first day with stock tickers data
-def run_portfolio_zr(portfolio, start_day=None, end_day=None, zr_sell=True, paper_trading=True, back_testing=False, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 240, 'days': 15}, **params): # refactor add paper_trading, back_testing # start_day and end_day are datetime objects # keep **params here and in run_portfolio_rr() so can use tickers_with_stock_splits for backtesting cases in which the fidelity service is down but the data for start_day and end_day is already loaded
-    print("running run_portfolio_zr()")
+# Not merging run_portfolio_fmpr/rr (previous run_portfolio_zr) into single function since even though it appears that sometimes only difference in algorithm functions is how to pick tickers there can be nuiances like if portfolio['constants']['up_down_move'] > 4: in run_portfolio_fmpr() and potentially more between portfolios
+# can make it run_portfolio_tr as well with tr_sell instead of fmpr_sell, 'Rating' instead of 'Zacks Rank', # maybe refactor and add error regarding start_day being before 2020-04-24 or 2020-05-08 since 05/08/2020 is first day with larger USA-listed stocks data (~4900 tickers) set, before that (04/24/2020 - 05/08/2020) it's smaller S&P 500 (505 tickers) data set, 04/24/2020 is first day with stock tickers data
+def run_portfolio_fmpr(portfolio, start_day=None, end_day=None, fmpr_sell=True, paper_trading=True, back_testing=False, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 240, 'days': 15}, **params): # refactor add paper_trading, back_testing # start_day and end_day are datetime objects # keep **params here and in run_portfolio_rr() so can use tickers_with_stock_splits for backtesting cases in which the fidelity service is down but the data for start_day and end_day is already loaded
+    print("running run_portfolio_fmpr()")
     # Basic error checks for now
     if (not type(portfolio['constants']['up_down_move']) is int) or not (1 <= portfolio['constants']['up_down_move'] <= 4): # here and below chatgpt simpler answer to: (portfolio['constants']['up_down_move'] < 0) or (portfolio['constants']['up_down_move'] > 4)
         print("Error up/down move constant is not an int within 1-4 inclusive")
@@ -1156,7 +1159,7 @@ def run_portfolio_zr(portfolio, start_day=None, end_day=None, zr_sell=True, pape
                     print("Sleeping " + str(add_pauses_to_avoid_unsolved_error['time']/60) + "min every " + str(add_pauses_to_avoid_unsolved_error['days']) + " days on date: " + str(stop_day.date()))
                     time.sleep(add_pauses_to_avoid_unsolved_error['time'])
                 portfolio = update_portfolio_postions_back_testing(portfolio=portfolio, stop_day=stop_day, end_day=end_day, tickers_with_stock_splits=tickers_with_stock_splits) #  # maybe refactor throughout and make it function(param1, param2, ...) rather than function(param1=param1, param2=param2, ...)
-            if zr_sell or (portfolio['balance']['usd'] >= portfolio['constants']['usd_invest_min']):
+            if fmpr_sell or (portfolio['balance']['usd'] >= portfolio['constants']['usd_invest_min']):
                 interval_start_date = stop_day - timedelta(days=DAYS)
                 while interval_start_date.weekday() > 4 or (interval_start_date.replace(hour=0, minute=0, second=0, microsecond=0) in usa_holidays): # no .replace(tzinfo=None) in run_portfolio_algo() since datetime for start/end/stop_day should be in local time (PST) # maybe refactor here and run_portfolio_algorithm's - potentially a lot of processing for a simple holidays check # interval_start_date = interval_start_date if (interval_start_date.weekday() < 5) else (interval_start_date - timedelta(days=interval_start_date.weekday()-4)) # to avoid weekends, always go further back than forward
                     interval_start_date = interval_start_date - timedelta(days=1)
@@ -1166,12 +1169,12 @@ def run_portfolio_zr(portfolio, start_day=None, end_day=None, zr_sell=True, pape
                     tickers_to_buy, tickers_to_sell = [], [] # Counter(), Counter()
                     for ticker in df_tickers_interval_stop.index:
                         try:
-                            if (ticker not in portfolio['open'].index) and (df_tickers_interval_stop.loc[ticker, 'Zacks Rank'] and (df_tickers_interval_stop.loc[ticker, 'Zacks Rank'] < 3)) and (df_tickers_interval_start.loc[ticker, 'Zacks Rank'] and (df_tickers_interval_start.loc[ticker, 'Zacks Rank'] >= 3)): # care if ticker has just turned to buy - Zacks Rank (1='Strong Buy', 3='Hold', 5='Strong Sell') # convenient since if 'Zacks Rank' is None conditional expression returns False instead of returning an error and continues, much faster
-                                rank_change = df_tickers_interval_start.loc[ticker, 'Zacks Rank'] - df_tickers_interval_stop.loc[ticker, 'Zacks Rank'] # can also make it rating_change if using tr 'Rating'
+                            if (ticker not in portfolio['open'].index) and (df_tickers_interval_stop.loc[ticker, 'FMP Rank'] and (df_tickers_interval_stop.loc[ticker, 'FMP Rank'] > 3)) and (df_tickers_interval_start.loc[ticker, 'FMP Rank'] and (df_tickers_interval_start.loc[ticker, 'FMP Rank'] <= 3)): # 'Zacks Rank' < >= # care if ticker has just turned to buy - FMP Rank (1='Strong Sell', 3='Hold', 5='Strong Buy'), Zacks Rank (1='Strong Buy', 3='Hold', 5='Strong Sell') # convenient since if 'Zacks Rank' is None conditional expression returns False instead of returning an error and continues, much faster
+                                rank_change = df_tickers_interval_stop.loc[ticker, 'FMP Rank'] - df_tickers_interval_start.loc[ticker, 'FMP Rank'] # can also make it rating_change if using tr 'Rating'
                                 if rank_change >= UP_MOVE:
                                     tickers_to_buy.append([ticker, rank_change]) # tickers_to_buy[ticker] = df_tickers_interval_stop.loc[ticker, 'Zacks Rank'] - df_tickers_interval_start.loc[ticker, 'Zacks Rank']
-                            elif zr_sell and (ticker in portfolio['open'].index) and (portfolio['open'].loc[ticker, 'trade_notes'] in ["Filled", "~Filled", None]) and (df_tickers_interval_stop.loc[ticker, 'Zacks Rank'] and (df_tickers_interval_stop.loc[ticker, 'Zacks Rank'] > 3)): # don't care if ticker has just turned to sell or has been sell for a while: if (df_tickers_interval_stop.loc[ticker, 'Zacks Rank'] > 3) and (df_tickers_interval_start.loc[ticker, 'Zacks Rank'] <= 3):
-                                rank_change = (df_tickers_interval_start.loc[ticker, 'Zacks Rank'] if df_tickers_interval_start.loc[ticker, 'Zacks Rank'] else float("NaN")) - df_tickers_interval_stop.loc[ticker, 'Zacks Rank'] # can also make it rating_change if using tr 'Rating'
+                            elif fmpr_sell and (ticker in portfolio['open'].index) and (portfolio['open'].loc[ticker, 'trade_notes'] in ["Filled", "~Filled", None]) and (df_tickers_interval_stop.loc[ticker, 'FMP Rank'] and (df_tickers_interval_stop.loc[ticker, 'FMP Rank'] < 3)): # > # don't care if ticker has just turned to sell or has been sell for a while: if (df_tickers_interval_stop.loc[ticker, 'Zacks Rank'] > 3) and (df_tickers_interval_start.loc[ticker, 'Zacks Rank'] <= 3):
+                                rank_change = df_tickers_interval_stop.loc[ticker, 'FMP Rank'] - (df_tickers_interval_start.loc[ticker, 'FMP Rank'] if df_tickers_interval_start.loc[ticker, 'FMP Rank'] else float("NaN")) # can also make it rating_change if using tr 'Rating'
                                 if rank_change <= DOWN_MOVE:
                                     tickers_to_sell.append([ticker, rank_change]) # tickers_to_sell[ticker] = df_tickers_interval_stop.loc[ticker, 'Zacks Rank'] - df_tickers_interval_start.loc[ticker, 'Zacks Rank']
                         except Exception as e:
@@ -1299,6 +1302,7 @@ def run_portfolio_tilupccu(portfolio, start_day=None, end_day=None, paper_tradin
             stop_day = stop_day + timedelta(days=1)
     return portfolio
 
+# Long backtesting time needs refactoring
 def run_portfolio_mmtv(portfolio, start_day=None, end_day=None, mmtv_sell=True, paper_trading=True, back_testing=False, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 240, 'days': 15}, **params): # 04/24/2020 and 04/27/2020 doesn't have proper ranking, before 05/08/2020 only have S&P 500 Rank which is not Market Cap rank # maybe refactor rr_buy/sell to algo_buy/sell, especially if add more algorithms # , rr_buy=True
     print("running run_portfolio_mmtv()")
     # UP_MOVE, DOWN_MOVE = portfolio['constants']['up_down_move'], -portfolio['constants']['up_down_move']
@@ -1655,7 +1659,8 @@ def run_portfolio_senate_trading(portfolio, start_day=None, end_day=None, senate
             break
     return portfolio
 
-def run_portfolio_sma_mm(portfolio, start_day=None, end_day=None, sma_mm_sell=True, paper_trading=True, limit_companies=1000, **params): # run during market hours
+# No backtesting only running during market hours
+def run_portfolio_sma_mm(portfolio, start_day=None, end_day=None, sma_mm_sell=True, paper_trading=True, limit_companies=1000, **params):
     print("running run_portfolio_sma_mm()")
     # no need for, always trading: sma_mm_sell or (portfolio['balance']['usd'] >= portfolio['constants']['usd_invest_min'])
     UP_DOWN_MOVE = portfolio['constants']['up_down_move'] # refactor and add UP_MOVE, DOWN_MOVE = portfolio['constants']['up_down_move'] in terms of 20D, 50D, 200D ie 200 or [50,200] if multiple
@@ -1663,7 +1668,7 @@ def run_portfolio_sma_mm(portfolio, start_day=None, end_day=None, sma_mm_sell=Tr
     if UP_DOWN_MOVE not in sma_mm_algos:
         print("Error up/down move is not in list of allowed algorithms: " + str(sma_mm_algos))
         return portfolio
-    success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_to_avoid, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
+    success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_to_avoid, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, False, **params)
     if success_or_error == "Error":
         print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio, returning")
         return portfolio
