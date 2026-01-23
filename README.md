@@ -129,7 +129,7 @@ rating = rating if rating else stocks.extract_investment_recommendation_2(buy_or
 ```python
 # Algorithms and their description, algorithms check for buy & sell opportunities every market day night except for random_sp500 (one every month), market checks during market hours every 4 minutes 365 days / year (for Stop-Loss, Trailing Stop-Loss)
 portfolios = {
-  'zr':  'Zacks Rank - Buy or sell tickers depending on their Zanks rank increase or decrease over the past interval days and if the ticker is in the Zacks rank buy or sell range (ie buy if rank increased 2 from 4/5-sell to 2/5-buy, sell if in portfolio and rank decreased 2 from 3/5-hold to 5/5-sell)',
+  'fmpr':  'FMP Rank - Buy or sell tickers depending on their FMP rank increase or decrease over the past interval days and if the ticker is in the FMP rank buy or sell range (ie buy if rank increased 2 from 2/5-sell to 4/5-buy, sell if in portfolio and rank decreased 2 from 3/5-hold to 1/5-strong sell)',
   'rr': 'Relative Rank - Buy or sell tickers depending if their Market Cap relative rank has moved above or below a threshold over the past interval days (ie buy if Market Cap rank has increased 50 over the past 20 days, sell if in portfolio and Market Cap rank has decreased 50 over the past 20 days)',
   'tilupccu': 'Top-Interval Loser (U = customizable ie # of losers, ranked by Market Cap or Percentage Loss) Peer Company Check (U = customizable ie EPS, PB, etc) - Buy tickers depending on their Market Cap and Percentage Loss over interval days and how strong their Peer Companies are (ie is it more likely to bounce back)'
   'mmtv': 'Momentum Mean Trading Volume - Buy the ticker if the Trading Volume is greater than the Mean Trading Volume over the interval days',
