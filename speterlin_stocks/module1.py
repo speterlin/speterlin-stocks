@@ -576,7 +576,7 @@ def should_I_buy_the_stock_google_gemini_pro(ticker, company_name, location=None
 def extract_investment_recommendation(analysis, ticker):
     start_time = time.time()
     try:
-        rating = float(re.findall(r"[2-9]", re.split("[C|c]onclusion|[R|r]ecommend[ation]{0,1}|[O|o]verall", analysis.text)[-1])[0]) # maybe add ^ed for recommend |[R|r]at[e|ed|ing] # excluding 0,1,10 outliers (extremely low or high recommendation) # maybe refactor add rating|recommendation
+        rating = float(re.findall(r"[2-9]", re.split("[C|c]onclusion|[R|r]ecommend[ation]{0,1}|[O|o]verall", analysis.text)[-1])[0]) # maybe add ^ed for recommend |[R|r]at[e|ed|ing] # here and below excluding 0,1,10 outliers (extremely low or high recommendation) (also conflicts with AI response 'on a scale of 1-10'/'out of 1/10' etc
     except Exception as e:
         print(str(e) + " - No (or issue with extracting) investment recommendation for: " + ticker + " on: " + str(datetime.now()) + ", Execution time: " + str(time.time() - start_time))
         rating = 0
@@ -588,7 +588,7 @@ def extract_investment_recommendation(analysis, ticker):
 def extract_investment_recommendation_2(analysis, ticker):
     start_time = time.time()
     try:
-        rating = float(re.findall(r"[2-9]", re.split(r"\srate\s|\srated\s|\srating\s", analysis.text)[-1])[0]) # \s[R|r]at[e|ed|ing]\s # [R|r]at[e|ed|ing] | # excluding 0,1,10 outliers (extremely low or high recommendation) # maybe refactor add rating|recommendation
+        rating = float(re.findall(r"[2-9]", re.split(r"\srate\s|\srated\s|\srating\s", analysis.text)[-1])[0]) # \s[R|r]at[e|ed|ing]\s
     except Exception as e:
         print(str(e) + " - No (or issue with extracting) investment recommendation for: " + ticker + " on: " + str(datetime.now()) + ", Execution time: " + str(time.time() - start_time))
         # rating = float(re.findall(r"[2-9]", re.split("[R|r]at[e|ed|ing]", analysis.text)[-1])[0])
@@ -918,11 +918,11 @@ def fmp_check_24h_vol(ticker, fmp_24h_vol, datetime, fmp_24h_vol_min=5000, paper
         twilio_message = _fetch_data(twilio_client.messages.create, params={'to': twilio_phone_to, 'from_': twilio_phone_from, 'body': message_body}, error_str=" - Twilio msg error to: " + twilio_phone_to + " on: " + str(datetime.now()), empty_data=None) if not paper_trading else None
     return fmp_24h_vol_too_low
 
-def update_portfolio_postions_back_testing(portfolio, stop_day, end_day, avoid_stock_split_corrections=True, **params): # maybe refactor name to update_portfolio_open_postions_back_testing, maybe integrate with portfolio_trading section so only have one function for both functions
+def update_portfolio_postions_back_testing(portfolio, stop_day, end_day, **params): # maybe refactor name to update_portfolio_open_postions_back_testing, maybe integrate with portfolio_trading section so only have one function for both functions
     STOP_LOSS = portfolio['constants']['sl']
     TRAILING_STOP_LOSS_ARM, TRAILING_STOP_LOSS_PERCENTAGE = portfolio['constants']['tsl_a'], portfolio['constants']['tsl_p']
     END_DAY_OPEN_POSITIONS_GTRENDS_15D, END_DAY_OPEN_POSITIONS_FMP_24H_VOL = portfolio['constants']['end_day_open_positions_gtrends_15d'], portfolio['constants']['end_day_open_positions_fmp_24h_vol']
-    tickers_with_stock_splits = params['tickers_with_stock_splits'] # probably add refactor precautionary
+    tickers_with_stock_splits = params['tickers_with_stock_splits'] # maybe refactor add precautionary but covered in check_for_basic_errors_and_set_general_params_for_run_portfolio
     tickers_to_avoid_splitting = {ticker: 'stock split already reflected on FMP' for ticker in ['POL','EXPR','DBGI','LTRY','SNMP','IDEX','CRKN','AGRI','REE','AREB','SOND','BSFC','AQB','ISPO','WATT','XXII','KXIN','NCMI','UXIN','DXF','SHPW','ALPP','FRSX','CRGE','MIMO','DMAQR','TANH','JL','NIVF']} # {'WLL': 'stock split not updated on yf', 'MYT': 'stock split not updated on yf'} # already covered in update_portfolio_buy_and_sell_tickers() add back if Yahoo Finance decides to update (hourly price data to match past daily price data) some tickers and not others # maybe refactor and add PDS: listed as PD:CA on Fidelity, split on November 11/12/2020, same day stock rose 20x
     for ticker in portfolio['open'].index:
         # hours=7 because 13-6.5=6.5 (which is 9:30EST == 6:30PST), and for some results 6.5 or 6.52 (1.2 minutes before opening) not enough to capture opening minute volume but 7 seemed sufficient, ending at 13 (16:00EST) seems to capture closing minute volume for cases tested
@@ -931,15 +931,17 @@ def update_portfolio_postions_back_testing(portfolio, stop_day, end_day, avoid_s
             print("Error retreiving granular market data for ticker: " + ticker + " on date: " + stop_day.strftime('%Y-%m-%d')) # error message should be covered in method
             portfolio['open'].loc[ticker, 'other_notes'] = "MDI " +  stop_day.strftime('%Y-%m-%d') # MDI stands for Market Data Issue
         else:
-            if not avoid_stock_split_corrections and (ticker not in tickers_to_avoid_splitting) and (ticker in tickers_with_stock_splits['symbol'].values): # ticker in tickers_with_stock_splits: # and (stop_day.date() < tickers_with_stock_splits[ticker]['ex_date'].date()) # and (ticker not in tickers_to_avoid_splitting) add back if Yahoo Finance decides to update (hourly price data to match past daily price data) some tickers and not others # because yahoo finance api updates past daily price data but not hourly price data following a stock split, maybe refactor if notice a change, assuming for now that it remains this way
-                divide_factor, prev_split_ratio, prev_ex_date = 1, float("NaN"), None # prev_ex_date etc logic to prevent double splitting (splits on the first not the second) on FMP errors (planned and executed duplicates most likely not in that order but logically)
-                for idx in tickers_with_stock_splits[tickers_with_stock_splits['symbol']==ticker].index.tolist(): # for ticker_with_stock_split_dict in tickers_with_stock_splits[ticker]:
-                    ex_date = datetime.strptime(tickers_with_stock_splits.loc[idx, 'date'], '%Y-%m-%d')
+            if tickers_with_stock_splits['apply_corrections'] and (ticker not in tickers_to_avoid_splitting) and (ticker in tickers_with_stock_splits['stock_splits']['symbol'].values): # ticker in tickers_with_stock_splits: # and (stop_day.date() < tickers_with_stock_splits[ticker]['ex_date'].date()) # and (ticker not in tickers_to_avoid_splitting) add back if Yahoo Finance decides to update (hourly price data to match past daily price data) some tickers and not others # because yahoo finance api updates past daily price data but not hourly price data following a stock split, maybe refactor if notice a change, assuming for now that it remains this way
+                divide_factor, prev_split_ratio, prev_ex_date, only_last_split, df_stock_splits = 1, float("NaN"), None, tickers_with_stock_splits['only_last_split'], tickers_with_stock_splits['stock_splits'] # prev_ex_date etc logic to prevent double splitting (splits on the first not the second) on FMP errors (planned and executed duplicates most likely not in that order but logically)
+                stock_split_idxs = df_stock_splits[df_stock_splits['symbol']==ticker].index.tolist() # tickers_with_stock_splits[tickers_with_stock_splits['symbol']==ticker].index.tolist()
+                stock_split_idxs = stock_split_idxs if not only_last_split else [stock_split_idxs[-1]]
+                for idx in stock_split_idxs: # for ticker_with_stock_split_dict in tickers_with_stock_splits[ticker]:
+                    ex_date = datetime.strptime(df_stock_splits.loc[idx, 'date'], '%Y-%m-%d')
                     prev_ex_date = prev_ex_date if prev_ex_date else (ex_date - timedelta(days=41))
                     if stop_day.date() < ex_date.date(): # if stop_day.date() < ticker_with_stock_split_dict['ex_date'].date():
-                        split_ratio = tickers_with_stock_splits.loc[idx, 'numerator'] / tickers_with_stock_splits.loc[idx, 'denominator'] # # print(str(prev_ex_date) + ": " + str(ex_date) + ", " + str(prev_split_ratio) + ": " + str(split_ratio))
+                        split_ratio = df_stock_splits.loc[idx, 'numerator'] / df_stock_splits.loc[idx, 'denominator'] # # print(str(prev_ex_date) + ": " + str(ex_date) + ", " + str(prev_split_ratio) + ": " + str(split_ratio))
                         if (prev_split_ratio != split_ratio) and (ex_date >= prev_ex_date + timedelta(days=40)): # dates are in chronological order # 40 day buffer to prevent duplicates? - don't think any credible company would split same ratio within 40 day period # and (ex_date >= prev_ex_date + timedelta(days=10))
-                            divide_factor *= (tickers_with_stock_splits.loc[idx, 'numerator'] / tickers_with_stock_splits.loc[idx, 'denominator']) # divide_factor *= ticker_with_stock_split_dict['split_ratio']
+                            divide_factor *= (df_stock_splits.loc[idx, 'numerator'] / df_stock_splits.loc[idx, 'denominator']) # divide_factor *= ticker_with_stock_split_dict['split_ratio']
                             prev_split_ratio, prev_ex_date = split_ratio, ex_date
                 ticker_data_granular[['open', 'high', 'low', 'close']] = ticker_data_granular[['open', 'high', 'low', 'close']].div([divide_factor]*len(ticker_data_granular), axis=0) # maybe refactor and add something precautionary if for some reason less or more than
             buy_price, tsl_armed, tsl_max_price, balance = portfolio['open'].loc[ticker, ['buy_price', 'tsl_armed', 'tsl_max_price', 'balance']]
@@ -1303,7 +1305,7 @@ def run_portfolio_tilupccu(portfolio, start_day=None, end_day=None, paper_tradin
     return portfolio
 
 # Long backtesting time needs refactoring
-def run_portfolio_mmtv(portfolio, start_day=None, end_day=None, mmtv_sell=True, paper_trading=True, back_testing=False, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 240, 'days': 15}, **params): # 04/24/2020 and 04/27/2020 doesn't have proper ranking, before 05/08/2020 only have S&P 500 Rank which is not Market Cap rank # maybe refactor rr_buy/sell to algo_buy/sell, especially if add more algorithms # , rr_buy=True
+def run_portfolio_mmtv(portfolio, start_day=None, end_day=None, mmtv_sell=True, paper_trading=True, back_testing=False, limit_tickers=100, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 240, 'days': 15}, **params): # 04/24/2020 and 04/27/2020 doesn't have proper ranking, before 05/08/2020 only have S&P 500 Rank which is not Market Cap rank # maybe refactor rr_buy/sell to algo_buy/sell, especially if add more algorithms # , rr_buy=True
     print("running run_portfolio_mmtv()")
     # UP_MOVE, DOWN_MOVE = portfolio['constants']['up_down_move'], -portfolio['constants']['up_down_move']
     success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_to_avoid, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
@@ -1326,16 +1328,16 @@ def run_portfolio_mmtv(portfolio, start_day=None, end_day=None, mmtv_sell=True, 
                 if not (df_tickers_interval_start.empty or df_tickers_interval_stop.empty): # df_tickers_interval_stop.empty
                     df_tickers_interval_start, df_tickers_interval_stop = df_tickers_interval_start[df_tickers_interval_start['Market Cap'] > 0].sort_values('Market Cap', ascending=False, inplace=False), df_tickers_interval_stop[df_tickers_interval_stop['Market Cap'] > 0].sort_values('Market Cap', ascending=False, inplace=False) # maybe refactor and only deal with equities (not ETFs, etc.)
                     tickers_to_buy, tickers_to_sell = [], [] # Counter(), Counter()
-                    for ticker in df_tickers_interval_stop.index: # (df_tickers_interval_stop if stop_day.date() < datetime.strptime('2020-05-08', '%Y-%m-%d').date() else df_tickers_interval_stop[df_tickers_interval_stop['Market Cap'] >= 2e9]).index: # df_tickers_interval_stop # if want to deal only with Mega, Large, Mid-Cap companies since smaller companies could cause complications with exchange listings etc. (but not on alpaca), S&P 500 tickers from 04/24/2020 until 05/08/2020
+                    for ticker in df_tickers_interval_stop[:limit_tickers].index: # (df_tickers_interval_stop if stop_day.date() < datetime.strptime('2020-05-08', '%Y-%m-%d').date() else df_tickers_interval_stop[df_tickers_interval_stop['Market Cap'] >= 2e9]).index: # df_tickers_interval_stop # if want to deal only with Mega, Large, Mid-Cap companies since smaller companies could cause complications with exchange listings etc. (but not on alpaca), S&P 500 tickers from 04/24/2020 until 05/08/2020
+                        trading_volume_stop_day = df_tickers_interval_stop.loc[ticker, 'Volume'] # trading_volume_on_interval_day if interval_day.date() == stop_day.date() else float("NaN")
                         interval_day, trading_volumes_since_interval, trading_volume_stop_day = interval_start_date, [], None
                         while interval_day.date() <= stop_day.date():
                             df_tickers_interval_day = get_saved_tickers_data(date=interval_day.strftime('%Y-%m-%d'))
                             try: # if not df_tickers_interval_day.empty else  None
                                 trading_volume_on_interval_day = df_tickers_interval_day.loc[ticker, 'Volume']
                             except:
-                                trading_volume_on_interval_day = None # can use isnan() as well but None is easier for filtering below
+                                trading_volume_on_interval_day = None # maybe refactor can use logically appropriate float("NaN") and isnan() below but None is easier for filtering below also df_tickers_interval_day.loc[ticker, 'Volume'] if empty more likely to be None than NaN
                             trading_volumes_since_interval.append(trading_volume_on_interval_day)
-                            trading_volume_stop_day = trading_volume_on_interval_day if interval_day.date() == stop_day.date() else float("NaN")
                             interval_day = interval_day + timedelta(days=1)
                             while interval_day.weekday() > 4 or (interval_day.replace(hour=0, minute=0, second=0, microsecond=0) in usa_holidays):
                                 interval_day = interval_day + timedelta(days=1)
@@ -1350,7 +1352,7 @@ def run_portfolio_mmtv(portfolio, start_day=None, end_day=None, mmtv_sell=True, 
                     # for ticker in list(set(df_tickers_interval_start.index.values) - set(df_tickers_interval_stop.index.values)):
                     #     tickers_to_sell.append([ticker, df_tickers_interval_start.index.get_loc(df_tickers_interval_start.loc[ticker].name) - (len(df_tickers_interval_start) - DOWN_MOVE)])
                     if (tickers_to_buy or tickers_to_sell):
-                        portfolio = update_portfolio_buy_and_sell_tickers(portfolio=portfolio, tickers_to_buy=tickers_to_buy, tickers_to_sell=tickers_to_sell, tickers_to_avoid=tickers_to_avoid, stop_day=stop_day, paper_trading=paper_trading, back_testing=back_testing)
+                        portfolio = update_portfolio_buy_and_sell_tickers(portfolio=portfolio, tickers_to_buy=sorted(tickers_to_buy, key=lambda x: x[1], reverse=True), tickers_to_sell=tickers_to_sell, tickers_to_avoid=tickers_to_avoid, stop_day=stop_day, paper_trading=paper_trading, back_testing=back_testing)
         else:
             print("skipping " +  str(stop_day) + " since portfolio has already run on this date")
         stop_day = stop_day + timedelta(days=1)
@@ -1471,7 +1473,7 @@ def run_portfolio_mm(portfolio, start_day=None, end_day=None, paper_trading=True
             stop_day = stop_day + timedelta(days=1)
     return portfolio
 
-def run_portfolio_ai_recommendations_in_sector(portfolio, start_day=None, end_day=None, airs_sell=True, paper_trading=True, back_testing=False, limit_companies=33, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 180, 'tickers': 50, 'days': 1000}, **params): # keep **params here and in run_portfolio_rr() so can pass variables for backtesting cases in which the yahoo finance service is down but the data for start_day and end_day is already loaded
+def run_portfolio_ai_recommendations_in_sector(portfolio, start_day=None, end_day=None, airs_sell=True, paper_trading=True, back_testing=False, limit_tickers=33, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 180, 'tickers': 50, 'days': 1000}, **params): # keep **params here and in run_portfolio_rr() so can pass variables for backtesting cases in which the yahoo finance service is down but the data for start_day and end_day is already loaded
     print("running run_portfolio_ai_recommendations_in_sector()")
     if (not type(portfolio['constants']['up_down_move']) is list) or len(portfolio['constants']['up_down_move']) != 3:
         print("Error up/down move constant is not a list or a list with length 3")
@@ -1500,7 +1502,7 @@ def run_portfolio_ai_recommendations_in_sector(portfolio, start_day=None, end_da
                     # refactor and add logic for dealing with if zacks rank is in  df_tickers_interval_start/stop
                     tickers_to_buy, tickers_to_sell = [], [] # Counter(), Counter()
                     # sector = 'Financial Services'
-                    for ticker in df_tickers_interval_stop[df_tickers_interval_stop['Sector'] == SECTOR][:limit_companies].index: # My OpenAI plan has a quota ~484 hits / day
+                    for ticker in df_tickers_interval_stop[df_tickers_interval_stop['Sector'] == SECTOR][:limit_tickers].index: # My OpenAI plan has a quota ~484 hits / day
                         ticker_count += 1
                         if add_pauses_to_avoid_unsolved_error['engaged'] and (ticker_count % add_pauses_to_avoid_unsolved_error['tickers'] == 0):
                             print("Sleeping " + str(add_pauses_to_avoid_unsolved_error['time']/60) + "min every " + str(add_pauses_to_avoid_unsolved_error['tickers']) + " tickers on date: " + str(stop_day.date()))
@@ -1660,7 +1662,7 @@ def run_portfolio_senate_trading(portfolio, start_day=None, end_day=None, senate
     return portfolio
 
 # No backtesting only running during market hours
-def run_portfolio_sma_mm(portfolio, start_day=None, end_day=None, sma_mm_sell=True, paper_trading=True, limit_companies=1000, **params):
+def run_portfolio_sma_mm(portfolio, start_day=None, end_day=None, sma_mm_sell=True, paper_trading=True, limit_tickers=1000, **params):
     print("running run_portfolio_sma_mm()")
     # no need for, always trading: sma_mm_sell or (portfolio['balance']['usd'] >= portfolio['constants']['usd_invest_min'])
     UP_DOWN_MOVE = portfolio['constants']['up_down_move'] # refactor and add UP_MOVE, DOWN_MOVE = portfolio['constants']['up_down_move'] in terms of 20D, 50D, 200D ie 200 or [50,200] if multiple
@@ -1712,7 +1714,7 @@ def run_portfolio_sma_mm(portfolio, start_day=None, end_day=None, sma_mm_sell=Tr
     sector = sectors[randint(0,len(sectors)-1)]
     print("Interval stop day: " + str(interval_stop_date) + ", Sector: " + str(sector))
     start_time, count, count_div, tickers_to_convert = time.time(), 0, 10 if UP_DOWN_MOVE != "price-200D-sp500" else 3, {'BRK.B': 'BRK-B', 'BRK.A': 'BRK-A'} # possibly refactor and add logic for tickers_to_convert (issue cause trade with Alpaca but get data with FMP)
-    df_tickers_to_iterate = df_tickers_interval_stop[df_tickers_interval_stop['Sector'] == sector][:limit_companies] if UP_DOWN_MOVE != "price-200D-sp500" else df_tickers_interval_stop[(df_tickers_interval_stop['Sector'] == sector) & (df_tickers_interval_stop.index.isin(df_tickers_sp500.index))][:limit_companies]
+    df_tickers_to_iterate = df_tickers_interval_stop[df_tickers_interval_stop['Sector'] == sector][:limit_tickers] if UP_DOWN_MOVE != "price-200D-sp500" else df_tickers_interval_stop[(df_tickers_interval_stop['Sector'] == sector) & (df_tickers_interval_stop.index.isin(df_tickers_sp500.index))][:limit_tickers]
     for ticker in df_tickers_to_iterate.index:
         count += 1
         if count % count_div == 0:

@@ -21,6 +21,7 @@ portfolio_rr_test = {
     'open': pd.DataFrame(columns=['position', 'buy_date', 'buy_price', 'balance', 'current_date', 'current_price', 'current_roi', 'fmp_24h_vol', 'gtrends_15d', 'rank_rise_d', 'tsl_armed', 'tsl_max_price', 'trade_notes', 'other_notes']).astype({'position': 'object', 'buy_date': 'datetime64[ns]', 'buy_price': 'float64', 'balance': 'float64', 'current_date': 'datetime64[ns]', 'current_price': 'float64', 'current_roi': 'float64', 'fmp_24h_vol': 'float64', 'gtrends_15d': 'float64', 'rank_rise_d': 'float64', 'tsl_armed': 'bool', 'tsl_max_price': 'float64', 'trade_notes': 'object', 'other_notes': 'object'}),
     'sold': pd.DataFrame(columns=['ticker', 'position', 'buy_date', 'buy_price', 'balance', 'sell_date', 'sell_price', 'roi', 'fmp_24h_vol', 'gtrends_15d', 'rank_rise_d', 'tsl_max_price', 'trade_notes', 'other_notes']).astype({'ticker': 'object', 'position': 'object', 'buy_date': 'datetime64[ns]', 'buy_price': 'float64', 'balance': 'float64', 'sell_date': 'datetime64[ns]', 'sell_price': 'float64', 'roi': 'float64', 'fmp_24h_vol': 'float64', 'gtrends_15d': 'float64', 'rank_rise_d': 'float64', 'tsl_max_price': 'float64', 'trade_notes': 'object', 'other_notes': 'object'})
 }
+# LONG BACKTESTING TIME on tilupccu type needs refactoring
 portfolio_tilupccu_test = {
     'constants': {'type': 'tilupccu', 'up_down_move': [1,-1], 'days': 2, 'sl': -0.15, 'tsl_a': 0.05, 'tsl_p': -0.0125, 'usd_invest': 2000, 'usd_invest_min': 100, 'buy_date_gtrends_15d': False, 'end_day_open_positions_gtrends_15d': False, 'end_day_open_positions_fmp_24h_vol': False, 'start_balance': {'usd': 10000}, 'start_day': start_day.strftime('%Y-%m-%d')},
     'balance': {'usd': 10000}, # alpaca only offers margin trading so if deposit $10k actually worth $20k (meaning if it shows $10k it's actually $5k deposited)
@@ -95,7 +96,7 @@ portfolio_sma_mm_test_3 = {
 }
 
 # DECLARE tickers_with_stock_splits, tickers_to_avoid (and senate_timestamps_and_tickers_inflows_and_outflows if running that algo) and BACKTEST a single algorithm with different parameters on a time period like in github.com/speterlin/quant-trading README.md#Backtesting in Python virtual environment shell (or different algorithms with set parameters like below), OR BACKTEST a single algorithm with set parameters on a time period like below
-paper_trading, back_testing, add_pauses_to_avoid_unsolved_error = True, True, {'engaged': True, 'time': 60, 'days': 40} # days naming reflects correct logic for all portfolio types except random_sp500 and senate_trading since back_testing increments are stop_day = stop_day + timedelta(days=DAYS) vs. stop_day = stop_day + timedelta(days=1), also doesn’t take into account weekends / holidays therefore 60 days ~ 60/5 ~ 12 weeks ~3 months vs. expected 2 months # {'engaged': True, 'time': 60, 'days': 30} # random_sp500 and senate_trading: {'engaged': True, 'time': 60, 'days': 5} # {'engaged': False, 'time': 420, 'days': 20}
+paper_trading, back_testing, add_pauses_to_avoid_unsolved_error = True, True, {'engaged': True, 'time': 60, 'days': 60} # days naming reflects correct logic for all portfolio types except random_sp500 and senate_trading since back_testing increments are stop_day = stop_day + timedelta(days=DAYS) vs. stop_day = stop_day + timedelta(days=1), also doesn’t take into account weekends / holidays therefore 60 days ~ 60/5 ~ 12 weeks ~3 months vs. expected 2 months # {'engaged': True, 'time': 60, 'days': 30} # random_sp500 and senate_trading: {'engaged': True, 'time': 60, 'days': 5} # {'engaged': False, 'time': 420, 'days': 20}
 portfolios = {
     'zr': portfolio_zr_test,
     'rr': portfolio_rr_test,
@@ -109,9 +110,20 @@ portfolios = {
     #'sma_mm': {portfolio_sma_mm_test['constants']['up_down_move']: portfolio_sma_mm_test, portfolio_sma_mm_test_2['constants']['up_down_move']: portfolio_sma_mm_test_2, portfolio_sma_mm_test_3['constants']['up_down_move']: portfolio_sma_mm_test_3}
 }
 
+tickers_with_stock_splits = {'apply_corrections': False, 'only_last_split': False, 'stock_splits': pd.DataFrame()}
 tickers_with_stock_splits = stocks.get_tickers_with_stock_splits_fmp(start_day=start_day)
+tickers_with_stock_splits = {'apply_corrections': True, 'only_last_split': False, 'stock_splits': tickers_with_stock_splits}
+tickers_with_stock_splits = {'apply_corrections': True, 'only_last_split': True, 'stock_splits': tickers_with_stock_splits}
 df_tickers_end_day = stocks.get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
 tickers_to_avoid = stocks.get_tickers_to_avoid(df_tickers_end_day, end_day)
+tickers_to_avoid['ATMC'] = {'reason': 'stock information not on FMP', 'good_after_date': datetime.strptime('2029_06_06 13:00:00', '%Y_%m_%d %H:%M:%S')}
+tickers_to_avoid['BLEUW'] = {'reason': 'stock misinformation on FMP', 'good_after_date': datetime.strptime('2029_06_06 13:00:00', '%Y_%m_%d %H:%M:%S')}
+tickers_to_avoid['GCMGW'] = {'reason': 'stock misinformation on FMP', 'good_after_date': datetime.strptime('2029_06_06 13:00:00', '%Y_%m_%d %H:%M:%S')}
+tickers_to_avoid['ONYXW'] = {'reason': 'stock misinformation on FMP', 'good_after_date': datetime.strptime('2029_06_06 13:00:00', '%Y_%m_%d %H:%M:%S')}
+tickers_to_avoid['KNW'] = {'reason': 'stock split not updated on FMP', 'good_after_date': datetime.strptime('2029_06_06 13:00:00', '%Y_%m_%d %H:%M:%S')}
+tickers_to_avoid['VCIG'] = {'reason': 'stock split not updated on FMP', 'good_after_date': datetime.strptime('2029_06_06 13:00:00', '%Y_%m_%d %H:%M:%S')}
+tickers_to_avoid['NITO'] = {'reason': 'stock split not updated on FMP', 'good_after_date': datetime.strptime('2029_06_06 13:00:00', '%Y_%m_%d %H:%M:%S')}
+
 
 # RUN portfolios
 for portfolio_name, portfolio in portfolios.items():
@@ -140,15 +152,15 @@ for portfolio_name, portfolio in portfolios.items():
     print(portfolio_name + ", USD Value: " + str(portfolio_usd_value) + ", USD Value Growth: " + str(portfolio_usd_value_growth))
 
 # RUN single portfolio
-portfolio_fmpr_test = stocks.run_portfolio(portfolio=portfolio_fmpr_test, start_day=start_day, end_day=end_day, paper_trading=paper_trading, back_testing=back_testing, add_pauses_to_avoid_unsolved_error=add_pauses_to_avoid_unsolved_error, tickers_with_stock_splits=tickers_with_stock_splits, tickers_to_avoid=tickers_to_avoid)
+portfolio_tilupccu_test = stocks.run_portfolio(portfolio=portfolio_tilupccu_test, start_day=start_day, end_day=end_day, paper_trading=paper_trading, back_testing=back_testing, add_pauses_to_avoid_unsolved_error=add_pauses_to_avoid_unsolved_error, tickers_with_stock_splits=tickers_with_stock_splits, tickers_to_avoid=tickers_to_avoid)
 
 # CHECK ROI of single portfolio
-portfolio_usd_value = portfolio_fmpr_test['balance']['usd']
-for ticker in portfolio_fmpr_test['open'].index:
-    portfolio_usd_value += portfolio_fmpr_test['open'].loc[ticker, 'current_price']*portfolio_fmpr_test['open'].loc[ticker, 'balance']
+portfolio_usd_value = portfolio_tilupccu_test['balance']['usd']
+for ticker in portfolio_tilupccu_test['open'].index:
+    portfolio_usd_value += portfolio_tilupccu_test['open'].loc[ticker, 'current_price']*portfolio_tilupccu_test['open'].loc[ticker, 'balance']
 
-portfolio_usd_value_growth = (portfolio_usd_value - portfolio_fmpr_test['constants']['start_balance']['usd']) / portfolio_fmpr_test['constants']['start_balance']['usd']
+portfolio_usd_value_growth = (portfolio_usd_value - portfolio_tilupccu_test['constants']['start_balance']['usd']) / portfolio_tilupccu_test['constants']['start_balance']['usd']
 
 # INSPECT OUTCOME of single portfolio
-portfolio_fmpr_test['sold'].sort_values('roi', inplace=False, ascending=False)[['ticker', 'buy_date', 'buy_price', 'balance', 'rank_rise_d', 'sell_date', 'sell_price', 'roi', 'other_notes']]
-portfolio_fmpr_test['open'].sort_values('current_roi', inplace=False, ascending=False)[['buy_date', 'buy_price', 'balance', 'rank_rise_d', 'current_date', 'current_price', 'current_roi', 'other_notes']]
+portfolio_tilupccu_test['sold'].sort_values('roi', inplace=False, ascending=False)[['ticker', 'buy_date', 'buy_price', 'balance', 'rank_rise_d', 'sell_date', 'sell_price', 'roi', 'other_notes']]
+portfolio_tilupccu_test['open'].sort_values('current_roi', inplace=False, ascending=False)[['buy_date', 'buy_price', 'balance', 'rank_rise_d', 'current_date', 'current_price', 'current_roi', 'other_notes']]
