@@ -1329,8 +1329,8 @@ def run_portfolio_mmtv(portfolio, start_day=None, end_day=None, mmtv_sell=True, 
                     df_tickers_interval_start, df_tickers_interval_stop = df_tickers_interval_start[df_tickers_interval_start['Market Cap'] > 0].sort_values('Market Cap', ascending=False, inplace=False), df_tickers_interval_stop[df_tickers_interval_stop['Market Cap'] > 0].sort_values('Market Cap', ascending=False, inplace=False) # maybe refactor and only deal with equities (not ETFs, etc.)
                     tickers_to_buy, tickers_to_sell = [], [] # Counter(), Counter()
                     for ticker in df_tickers_interval_stop[:limit_tickers].index: # (df_tickers_interval_stop if stop_day.date() < datetime.strptime('2020-05-08', '%Y-%m-%d').date() else df_tickers_interval_stop[df_tickers_interval_stop['Market Cap'] >= 2e9]).index: # df_tickers_interval_stop # if want to deal only with Mega, Large, Mid-Cap companies since smaller companies could cause complications with exchange listings etc. (but not on alpaca), S&P 500 tickers from 04/24/2020 until 05/08/2020
-                        trading_volume_stop_day = df_tickers_interval_stop.loc[ticker, 'Volume'] # trading_volume_on_interval_day if interval_day.date() == stop_day.date() else float("NaN")
-                        interval_day, trading_volumes_since_interval, trading_volume_stop_day = interval_start_date, [], None
+                        trading_volume_stop_day = df_tickers_interval_stop.loc[ticker, 'Volume'] # if df_tickers_interval_stop.loc[ticker, 'Volume'] else float("NaN") # trading_volume_on_interval_day if interval_day.date() == stop_day.date() else float("NaN")
+                        interval_day, trading_volumes_since_interval = interval_start_date, []
                         while interval_day.date() <= stop_day.date():
                             df_tickers_interval_day = get_saved_tickers_data(date=interval_day.strftime('%Y-%m-%d'))
                             try: # if not df_tickers_interval_day.empty else  None
