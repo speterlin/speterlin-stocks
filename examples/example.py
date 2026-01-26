@@ -96,7 +96,7 @@ portfolio_sma_mm_test_3 = {
 }
 
 # DECLARE tickers_with_stock_splits, tickers_to_avoid (and senate_timestamps_and_tickers_inflows_and_outflows if running that algo) and BACKTEST a single algorithm with different parameters on a time period like in github.com/speterlin/quant-trading README.md#Backtesting in Python virtual environment shell (or different algorithms with set parameters like below), OR BACKTEST a single algorithm with set parameters on a time period like below
-paper_trading, back_testing, add_pauses_to_avoid_unsolved_error = True, True, {'engaged': True, 'time': 60, 'days': 60} # days naming reflects correct logic for all portfolio types except random_sp500 and senate_trading since back_testing increments are stop_day = stop_day + timedelta(days=DAYS) vs. stop_day = stop_day + timedelta(days=1), also doesn’t take into account weekends / holidays therefore 60 days ~ 60/5 ~ 12 weeks ~3 months vs. expected 2 months # {'engaged': True, 'time': 60, 'days': 30} # random_sp500 and senate_trading: {'engaged': True, 'time': 60, 'days': 5} # {'engaged': False, 'time': 420, 'days': 20}
+paper_trading, back_testing, add_pauses_to_avoid_unsolved_error = True, True, {'engaged': True, 'time': 60, 'days': 40} # days naming reflects correct logic for all portfolio types except random_sp500 and senate_trading since back_testing increments are stop_day = stop_day + timedelta(days=DAYS) vs. stop_day = stop_day + timedelta(days=1), also doesn’t take into account weekends / holidays therefore 60 days ~ 60/5 ~ 12 weeks ~3 months vs. expected 2 months # {'engaged': True, 'time': 60, 'days': 30} # random_sp500 and senate_trading: {'engaged': True, 'time': 60, 'days': 5} # {'engaged': False, 'time': 420, 'days': 20}
 portfolios = {
     'zr': portfolio_zr_test,
     'rr': portfolio_rr_test,
@@ -116,13 +116,24 @@ tickers_with_stock_splits = {'apply_corrections': True, 'only_last_split': False
 tickers_with_stock_splits = {'apply_corrections': True, 'only_last_split': True, 'stock_splits': tickers_with_stock_splits}
 df_tickers_end_day = stocks.get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
 tickers_to_avoid = stocks.get_tickers_to_avoid(df_tickers_end_day, end_day)
-tickers_to_avoid['ATMC'] = {'reason': 'stock information not on FMP', 'good_after_date': datetime.strptime('2029_06_06 13:00:00', '%Y_%m_%d %H:%M:%S')}
-tickers_to_avoid['BLEUW'] = {'reason': 'stock misinformation on FMP', 'good_after_date': datetime.strptime('2029_06_06 13:00:00', '%Y_%m_%d %H:%M:%S')}
-tickers_to_avoid['GCMGW'] = {'reason': 'stock misinformation on FMP', 'good_after_date': datetime.strptime('2029_06_06 13:00:00', '%Y_%m_%d %H:%M:%S')}
-tickers_to_avoid['ONYXW'] = {'reason': 'stock misinformation on FMP', 'good_after_date': datetime.strptime('2029_06_06 13:00:00', '%Y_%m_%d %H:%M:%S')}
-tickers_to_avoid['KNW'] = {'reason': 'stock split not updated on FMP', 'good_after_date': datetime.strptime('2029_06_06 13:00:00', '%Y_%m_%d %H:%M:%S')}
-tickers_to_avoid['VCIG'] = {'reason': 'stock split not updated on FMP', 'good_after_date': datetime.strptime('2029_06_06 13:00:00', '%Y_%m_%d %H:%M:%S')}
-tickers_to_avoid['NITO'] = {'reason': 'stock split not updated on FMP', 'good_after_date': datetime.strptime('2029_06_06 13:00:00', '%Y_%m_%d %H:%M:%S')}
+# tickers_to_avoid[''] = {'reason': 'stock information not on FMP', 'good_after_date': datetime.strptime('2029_06_06 13:00:00', '%Y_%m_%d %H:%M:%S')}
+tickers_to_avoid = {**{ticker: {'reason': 'stock granular market data (issue with date column) not on FMP', 'good_after_date': datetime.strptime('2029_06_06 13:00:00', '%Y_%m_%d %H:%M:%S')} for ticker in [
+    'ATMC', # fmpr backtest issue
+]}, **tickers_to_avoid}
+tickers_to_avoid = {**{ticker: {'reason': 'stock 1d market data not on FMP', 'good_after_date': datetime.strptime('2029_06_06 13:00:00', '%Y_%m_%d %H:%M:%S')} for ticker in [
+    'GCMGW', # tilupccu backtest issue 2025-11-17->11-18
+]}, **tickers_to_avoid}
+tickers_to_avoid = {**{ticker: {'reason': 'stock 1d and granular market data (issue with date column) not on FMP', 'good_after_date': datetime.strptime('2029_06_06 13:00:00', '%Y_%m_%d %H:%M:%S')} for ticker in [
+    'BLEUW', # tilupccu backtest issue 2024-11-21->11-22
+    'ONYXW' # tilupccu backtest issue 2024-10-09->10-28
+]}, **tickers_to_avoid}
+# only_last_split resolves error
+tickers_to_avoid = {**{ticker: {'reason': 'stock split not updated on FMP', 'good_after_date': datetime.strptime('2029_06_06 13:00:00', '%Y_%m_%d %H:%M:%S')} for ticker in [
+    'KNW', # tilupccu backtest issue 2025-01-29->03-05
+    'VCIG', # tilupccu backtest issue 2025-03-12->03-14,03-27,08-29,07-29
+    'NITO', # tilupccu backtest issue 2025-05-19->05-20,05-21,09-19,05-08
+    'NIVF' # tilupccu backtest issue 2025-03-04->05
+]}, **tickers_to_avoid}
 
 
 # RUN portfolios
