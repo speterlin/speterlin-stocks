@@ -110,10 +110,13 @@ portfolios = {
     #'sma_mm': {portfolio_sma_mm_test['constants']['up_down_move']: portfolio_sma_mm_test, portfolio_sma_mm_test_2['constants']['up_down_move']: portfolio_sma_mm_test_2, portfolio_sma_mm_test_3['constants']['up_down_move']: portfolio_sma_mm_test_3}
 }
 
+# DATA FMP Issues between ticker_data and ticker_data_granular
 # tickers_with_stock_splits = {'apply_corrections': False, 'only_last_split': False, 'stock_splits': pd.DataFrame()}
 df_tickers_with_stock_splits = stocks.get_tickers_with_stock_splits_fmp(start_day=start_day)
-tickers_with_stock_splits = {'apply_corrections': True, 'only_last_split': True, 'stock_splits': df_tickers_with_stock_splits}
+tickers_to_avoid_splitting = {ticker: 'stock split already reflected on FMP' for ticker in ['POL','EXPR','DBGI','LTRY','SNMP','IDEX','CRKN','AGRI','REE','AREB','SOND','BSFC','AQB','ISPO','WATT','XXII','KXIN','NCMI','UXIN','DXF','SHPW','ALPP','FRSX','CRGE','MIMO','DMAQR','TANH','JL', 'MMAT','GTI','KAVL','GURE','NCL','AEVA']} # 'NIVF' # {'WLL': 'stock split not updated on yf', 'MYT': 'stock split not updated on yf'} # already covered in update_portfolio_buy_and_sell_tickers() add back if Yahoo Finance decides to update (hourly price data to match past daily price data) some tickers and not others # maybe refactor and add PDS: listed as PD:CA on Fidelity, split on November 11/12/2020, same day stock rose 20x
+tickers_with_stock_splits = {'apply_corrections': True, 'only_last_split': True, 'avoid_splitting': tickers_to_avoid_splitting, 'stock_splits': df_tickers_with_stock_splits}
 # tickers_with_stock_splits = {'apply_corrections': True, 'only_last_split': False, 'stock_splits': df_tickers_with_stock_splits}
+
 df_tickers_end_day = stocks.get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
 tickers_to_avoid = stocks.get_tickers_to_avoid(df_tickers_end_day, end_day)
 # tickers_to_avoid[''] = {'reason': 'stock information not on FMP', 'good_after_date': datetime.strptime('2029_06_06 13:00:00', '%Y_%m_%d %H:%M:%S')}
@@ -124,6 +127,7 @@ tickers_to_avoid = {**{ticker: {'reason': 'stock 1d and granular market data (is
     'BLEUW', # tilupccu backtest issue 2024-11-21->11-22
     'ONYXW' # tilupccu backtest issue 2024-10-09->10-28
 ]}, **tickers_to_avoid}
+# this is in tilupccu so prob ok
 tickers_to_avoid = {**{ticker: {'reason': 'stock 1d market data not on FMP', 'good_after_date': datetime.strptime('2029_06_06 13:00:00', '%Y_%m_%d %H:%M:%S')} for ticker in [
 'GCMGW', # tilupccu backtest issue 2025-11-17->11-18
 ]}, **tickers_to_avoid}
@@ -163,15 +167,15 @@ for portfolio_name, portfolio in portfolios.items():
     print(portfolio_name + ", USD Value: " + str(portfolio_usd_value) + ", USD Value Growth: " + str(portfolio_usd_value_growth))
 
 # RUN single portfolio
-portfolio_mmtv_test = stocks.run_portfolio(portfolio=portfolio_mmtv_test, start_day=start_day, end_day=end_day, paper_trading=paper_trading, back_testing=back_testing, add_pauses_to_avoid_unsolved_error=add_pauses_to_avoid_unsolved_error, tickers_with_stock_splits=tickers_with_stock_splits, tickers_to_avoid=tickers_to_avoid)
+portfolio_tilupccu_test = stocks.run_portfolio(portfolio=portfolio_tilupccu_test, start_day=start_day, end_day=end_day, paper_trading=paper_trading, back_testing=back_testing, add_pauses_to_avoid_unsolved_error=add_pauses_to_avoid_unsolved_error, tickers_with_stock_splits=tickers_with_stock_splits, tickers_to_avoid=tickers_to_avoid)
 
 # CHECK ROI of single portfolio
-portfolio_usd_value = portfolio_mmtv_test['balance']['usd']
-for ticker in portfolio_mmtv_test['open'].index:
-    portfolio_usd_value += portfolio_mmtv_test['open'].loc[ticker, 'current_price']*portfolio_mmtv_test['open'].loc[ticker, 'balance']
+portfolio_usd_value = portfolio_tilupccu_test['balance']['usd']
+for ticker in portfolio_tilupccu_test['open'].index:
+    portfolio_usd_value += portfolio_tilupccu_test['open'].loc[ticker, 'current_price']*portfolio_tilupccu_test['open'].loc[ticker, 'balance']
 
-portfolio_usd_value_growth = (portfolio_usd_value - portfolio_mmtv_test['constants']['start_balance']['usd']) / portfolio_mmtv_test['constants']['start_balance']['usd']
+portfolio_usd_value_growth = (portfolio_usd_value - portfolio_tilupccu_test['constants']['start_balance']['usd']) / portfolio_tilupccu_test['constants']['start_balance']['usd']
 
 # INSPECT OUTCOME of single portfolio
-portfolio_mmtv_test['sold'].sort_values('roi', inplace=False, ascending=False)[['ticker', 'buy_date', 'buy_price', 'balance', 'rank_rise_d', 'sell_date', 'sell_price', 'roi', 'other_notes']]
-portfolio_mmtv_test['open'].sort_values('current_roi', inplace=False, ascending=False)[['buy_date', 'buy_price', 'balance', 'rank_rise_d', 'current_date', 'current_price', 'current_roi', 'other_notes']]
+portfolio_tilupccu_test['sold'].sort_values('roi', inplace=False, ascending=False)[['ticker', 'buy_date', 'buy_price', 'balance', 'rank_rise_d', 'sell_date', 'sell_price', 'roi', 'other_notes']]
+portfolio_tilupccu_test['open'].sort_values('current_roi', inplace=False, ascending=False)[['buy_date', 'buy_price', 'balance', 'rank_rise_d', 'current_date', 'current_price', 'current_roi', 'other_notes']]
