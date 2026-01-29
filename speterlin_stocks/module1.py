@@ -994,24 +994,28 @@ def update_portfolio_postions_back_testing(portfolio, stop_day, end_day, **param
                 portfolio['open'].loc[ticker, ['current_date','current_price','current_roi','tsl_armed','tsl_max_price']] = [stop_day, price, price_change, tsl_armed, tsl_max_price]
     return portfolio
 
+# Can't trade ADR|ADS or Warrants on Alpaca, potentially refactor add case insensitive and whole word matching
 def get_tickers_to_avoid_in_alpaca(df_usa_alpaca_tickers_of_the_day): # usa_alpaca_tickers_end_with_y_with_no_current_alpaca_trade_data
+    print("Running get_tickers_to_avoid_in_alpaca()")
+    adr_ads_warrant_tickers = {}
     if (not type(df_usa_alpaca_tickers_of_the_day) is pd.core.frame.DataFrame) or df_usa_alpaca_tickers_of_the_day.empty:
         print("Must pass a non-empty dataframe as parameter")
         return {}
-    tickers_end_with_y = df_usa_alpaca_tickers_of_the_day[df_usa_alpaca_tickers_of_the_day.index.str.endswith("Y")]
-    tickers_end_with_y_not_refleced_on_alpaca, tickers_end_with_y_reflected_on_alpaca, count = {}, [], 0
+    tickers_end_with_y = df_usa_alpaca_tickers_of_the_day[df_usa_alpaca_tickers_of_the_day.index.str.endswith("Y")] # tickers_end_with_y_not_refleced_on_alpaca, tickers_end_with_y_reflected_on_alpaca, count = {}, [], 0
     for ticker in tickers_end_with_y.index:
-        last_trade_data = _fetch_data(alpaca_api.get_latest_trade, params={'symbol': ticker}, error_str=" - No last trade from Alpaca for ticker: " + ticker + " on: " + str(datetime.now()), empty_data = {})
-        if not last_trade_data:
-            count += 1
-            tickers_end_with_y_not_refleced_on_alpaca[ticker] = {'reason': 'stock information not on Alpaca', 'good_after_date': datetime.strptime('2029_06_06 13:00:00', '%Y_%m_%d %H:%M:%S')} # 2029 is some arbitrary date in future # tickers_end_with_y_not_refleced_on_alpaca.append(ticker)
-        else:
-            tickers_end_with_y_reflected_on_alpaca.append(ticker) # for other future purposes
-    return tickers_end_with_y_not_refleced_on_alpaca # [, tickers_end_with_y_reflected_on_alpaca]
+        if re.search(r"(ADR|ADS|American\s(?:Depositary|Depository)\s(?:Receipt|Share)s?)", df_usa_alpaca_tickers_of_the_day.loc[ticker, 'Name (Alpaca)']): # chatgpt regex recommendation # last_word_of_alpaca_name = df_usa_alpaca_tickers_of_the_day.loc[ticker, 'Name (Alpaca)'].split(" ")[-1] # if last_word_of_alpaca_name == 'Warrant' or last_word_of_alpaca_name == 'Warrants':
+            adr_ads_warrant_tickers[ticker] = {'reason': "Can't trade ADR|ADS tickers on Alpaca", 'good_after_date': datetime.strptime('2029_06_06 13:00:00', '%Y_%m_%d %H:%M:%S')} # 2029 is some arbitrary date in future # tickers_end_with_y_not_refleced_on_alpaca.append(ticker)
+        # else: # print(ticker + ": " + df_usa_alpaca_tickers_of_the_day.loc[ticker, 'Name (Alpaca)'])
+    tickers_end_with_w = df_usa_alpaca_tickers_of_the_day[df_usa_alpaca_tickers_of_the_day.index.str.endswith("W")]
+    for ticker in tickers_end_with_w.index:
+        if re.search(r"Warrant", df_usa_alpaca_tickers_of_the_day.loc[ticker, 'Name (Alpaca)']): # last_word_of_alpaca_name = df_usa_alpaca_tickers_of_the_day.loc[ticker, 'Name (Alpaca)'].split(" ")[-1] # if last_word_of_alpaca_name == 'Warrant' or last_word_of_alpaca_name == 'Warrants':
+            adr_ads_warrant_tickers[ticker] = {'reason': "Can't trade Warrant tickers on Alpaca", 'good_after_date': datetime.strptime('2029_06_06 13:00:00', '%Y_%m_%d %H:%M:%S')}
+        # else: # print(ticker + ": " + df_usa_alpaca_tickers_of_the_day.loc[ticker, 'Name (Alpaca)'])
+    return adr_ads_warrant_tickers # [, tickers_end_with_y_reflected_on_alpaca]
 
 def get_tickers_to_avoid(df_usa_alpaca_tickers_of_the_day, end_day): # probably refactor
     if (not type(end_day) is datetime):
-        print("End day must pass be of type datetime")
+        print("End day must be of type datetime")
         return {}
     tickers_to_avoid_in_alpaca = get_tickers_to_avoid_in_alpaca(df_usa_alpaca_tickers_of_the_day)
     tickers_to_avoid = {**{'TLSA': 'yf issue with hourly/minutely vs. daily data', 'RVI': 'ticker price issue and stock split not found on yf'}, **{key: value['reason'] for key,value in {**{'WLL': {'reason': 'stock split not updated on yf', 'good_after_date': datetime.strptime('2020_09_03 13:00:00', '%Y_%m_%d %H:%M:%S')}, 'MYT': {'reason': 'stock split not updated on yf', 'good_after_date': datetime.strptime('2020_08_27 13:00:00', '%Y_%m_%d %H:%M:%S')}, 'IAC': {'reason': 'stock split not updated on yf', 'good_after_date': datetime.strptime('2021_05_25 13:00:00', '%Y_%m_%d %H:%M:%S')}, 'ELP': {'reason': 'stock split not updated on yf', 'good_after_date': datetime.strptime('2021_04_28 13:00:00', '%Y_%m_%d %H:%M:%S')}, 'AIV': {'reason': 'stock split not updated on yf', 'good_after_date': datetime.strptime('2020_12_15 13:00:00', '%Y_%m_%d %H:%M:%S')}}, **tickers_to_avoid_in_alpaca}.items() if end_day.date() < value['good_after_date'].date()}} # **{ticker: {'reason': 'stock information not on Alpaca', 'good_after_date': datetime.strptime('2029_06_06 13:00:00', '%Y_%m_%d %H:%M:%S')} for ticker in ['ADYEY', 'ATEYY', 'CTTAY', 'AMKBY', 'IFNNY', 'XIACY', 'NGLOY', 'NJDCY', 'SVNDY', 'PROSY', 'YZCAY', 'NVZMY', 'SFTBY', 'LSRCY', 'SMNEY', 'ZLNDY', 'MPNGY', 'HKXCY', 'GXYYY', 'SOBKY', 'TTDKY', 'NDEKY', 'HSHCY', 'SCHYY', 'GELYY', 'PNGAY', 'SHTDY', 'CRZBY', 'PBCRY', 'PPERY', 'WMMVY', 'ITOCY', 'ASHTY', 'OVCHY', 'SOUHY', 'LNVGY', 'SAXPY', 'RCRUY', 'ACGBY', 'IDCBY', 'BACHY', 'SDVKY', 'BAYRY', 'MURGY', 'BAESY', 'VWAGY', 'VWAPY', 'DHLGY', 'BASFY', 'NRDBY', 'BDRFY', 'MIELY', 'CSUAY', 'RNECY', 'ALIZY', 'CHGCY', 'SMMNY', 'BYDDY', 'TOELY', 'DSNKY', 'HOCPY', 'HTHIY', 'SSEZY', 'NCLTY', 'FANUY']} # possibly add 'EDU' (issues between 2020-10-06->2021-01-22), 'NTES' (issues between 2020-08-27->2020-09-29), 'ELP' (similar for 'AVI'): stop_day < 2021-03-18 (divide by 2 - 10/1 split followed by a 1/5 split) elif stop_day < 2021-04-28 (multiply by 5 - 1/5 split) # in general avoid tickers with low market cap and issues (not worth extra trouble of coding around) or tickers with multiple splits in short time period (maybe refactor - would also have to refactor tickers_with_stock_splits_in_day()) # not refactoring ‘stock split not updated on yf’ code (4 repeated) since different good_after_date(s)
@@ -1123,15 +1127,10 @@ def check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, s
     stop_day = start_day + timedelta(days=DAYS)
     if (back_testing and not paper_trading) or (not back_testing and (stop_day < datetime.now() - timedelta(hours=back_running_allowance))): # back_running_allowance=11 for airs for some reason # 6:30am (new data arrives - except weekends & holidays) - 01:00pm previous day = 17.5 # assuming datetime input is always in 13:00:00 and run after market close of the stop_day # (stop_day.date() != datetime.now().date()) # maybe refactor here and below, allow 24 hours or more custom (especially if run update_portfolio_buy_and_sell_tickers() more than once per day after market hours as it is now or if account for running on weekends) # could also be more like in crypto.py or add full datetime comparison # here and below no need to check for (end_day.date() <= start_day.date()) since while loop won't execute (since stop_day is always > start_day will be greater than end_day)
         print("Error (backtesting and not paper trading) or back running")
-        return ["Error", portfolio, None, None, None, None, None, None, None, None]
+        return ["Error", portfolio, None, None, None, None, None, None, None]
     if start_day.date() < datetime.strptime('2020_05_08 13:00:00', '%Y_%m_%d %H:%M:%S').date():
         print("Error saved S&P 500 tickers data with ['zr'] ordered alphabetically rather than by S&P 500 rank on 2020-04-24 and 2020-04-27, only have S&P 500 ranked (not by Market Cap) tickers data before 2020-05-08") # ['zr'] to match other error strings # "Error no saved TradingView Ratings before 2020-05-08"
-        return ["Error", portfolio, None, None, None, None, None, None, None, None]
-    if 'tickers_to_avoid' in params: # this is needed for backtesting and real running
-        tickers_to_avoid = params['tickers_to_avoid']
-    else:
-        df_tickers_end_day = get_saved_tickers_data(date=end_day.strftime('%Y-%m-%d'))
-        tickers_to_avoid = get_tickers_to_avoid(df_tickers_end_day, end_day)
+        return ["Error", portfolio, None, None, None, None, None, None, None]
     if back_testing:
         tickers_with_stock_splits = params['tickers_with_stock_splits'] if 'tickers_with_stock_splits' in params else get_tickers_with_stock_splits_fmp(start_day=start_day) # since difference between daily (updated) and hourly (not updated) yahoo finance data for stocks that split after start day - this line in update_portfolio_postions_back_testing(): stop_day.date() < tickers_with_stock_splits[ticker]['ex_date'].date() should take care of issue
         count = 0 # since unresolved OSError: (50, 'ENETDOWN'/etc.), pause 60s every 30 days (most recently errored 2 months out)
@@ -1143,7 +1142,7 @@ def check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, s
     # SHORT = False # possibly add short logic
     # get most exchange tickers listing
     # exchange_prices = exchange_client.get_all_tickers()
-    return ["Success", portfolio, DAYS, end_day, start_day, stop_day, tickers_to_avoid, tickers_with_stock_splits, count, usa_holidays]
+    return ["Success", portfolio, DAYS, end_day, start_day, stop_day, tickers_with_stock_splits, count, usa_holidays]
 
 # Not merging run_portfolio_fmpr/rr (previous run_portfolio_zr) into single function since even though it appears that sometimes only difference in algorithm functions is how to pick tickers there can be nuiances like if portfolio['constants']['up_down_move'] > 4: in run_portfolio_fmpr() and potentially more between portfolios
 # can make it run_portfolio_tr as well with tr_sell instead of fmpr_sell, 'Rating' instead of 'Zacks Rank', # maybe refactor and add error regarding start_day being before 2020-04-24 or 2020-05-08 since 05/08/2020 is first day with larger USA-listed stocks data (~4900 tickers) set, before that (04/24/2020 - 05/08/2020) it's smaller S&P 500 (505 tickers) data set, 04/24/2020 is first day with stock tickers data
@@ -1154,7 +1153,7 @@ def run_portfolio_fmpr(portfolio, start_day=None, end_day=None, fmpr_sell=True, 
         print("Error up/down move constant is not an int within 1-4 inclusive")
         return portfolio
     UP_MOVE, DOWN_MOVE = portfolio['constants']['up_down_move'], -portfolio['constants']['up_down_move'] # maybe refactor and add similar to up_down_move with difference between start day's zacks rank and stop day's zacks rank,
-    success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_to_avoid, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
+    success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
     if success_or_error == "Error":
         print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio, returning")
         return portfolio
@@ -1187,7 +1186,7 @@ def run_portfolio_fmpr(portfolio, start_day=None, end_day=None, fmpr_sell=True, 
                         except Exception as e:
                             print(str(e) + " - Unable to execute, " + ticker + " not in df_tickers_interval_stop on: " + stop_day.strftime('%Y-%m-%d') + " or not in df_tickers_interval_start on: " + interval_start_date.strftime('%Y-%m-%d'))
                     if (tickers_to_buy or tickers_to_sell):
-                        portfolio = update_portfolio_buy_and_sell_tickers(portfolio=portfolio, tickers_to_buy=tickers_to_buy, tickers_to_sell=tickers_to_sell, tickers_to_avoid=tickers_to_avoid, stop_day=stop_day, paper_trading=paper_trading, back_testing=back_testing)
+                        portfolio = update_portfolio_buy_and_sell_tickers(portfolio=portfolio, tickers_to_buy=tickers_to_buy, tickers_to_sell=tickers_to_sell, tickers_to_avoid=get_tickers_to_avoid(df_tickers_interval_stop, stop_day), stop_day=stop_day, paper_trading=paper_trading, back_testing=back_testing)
         else:
             print("skipping " +  str(stop_day) + " since portfolio has already run on this date")
         stop_day = stop_day + timedelta(days=1)
@@ -1201,7 +1200,7 @@ def run_portfolio_rr(portfolio, start_day=None, end_day=None, rr_sell=True, pape
         print("Error up/down move constant is not an int within 1-100 inclusive")
         return portfolio
     UP_MOVE, DOWN_MOVE = portfolio['constants']['up_down_move'], -portfolio['constants']['up_down_move']
-    success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_to_avoid, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
+    success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
     if success_or_error == "Error":
         print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio, returning")
         return portfolio
@@ -1235,7 +1234,7 @@ def run_portfolio_rr(portfolio, start_day=None, end_day=None, rr_sell=True, pape
                     # for ticker in list(set(df_tickers_interval_start.index.values) - set(df_tickers_interval_stop.index.values)):
                     #     tickers_to_sell.append([ticker, df_tickers_interval_start.index.get_loc(df_tickers_interval_start.loc[ticker].name) - (len(df_tickers_interval_start) - DOWN_MOVE)])
                     if (tickers_to_buy or tickers_to_sell):
-                        portfolio = update_portfolio_buy_and_sell_tickers(portfolio=portfolio, tickers_to_buy=tickers_to_buy, tickers_to_sell=tickers_to_sell, tickers_to_avoid=tickers_to_avoid, stop_day=stop_day, paper_trading=paper_trading, back_testing=back_testing)
+                        portfolio = update_portfolio_buy_and_sell_tickers(portfolio=portfolio, tickers_to_buy=tickers_to_buy, tickers_to_sell=tickers_to_sell, tickers_to_avoid=get_tickers_to_avoid(df_tickers_interval_stop, stop_day), stop_day=stop_day, paper_trading=paper_trading, back_testing=back_testing)
         else:
             print("skipping " +  str(stop_day) + " since portfolio has already run on this date")
         stop_day = stop_day + timedelta(days=1)
@@ -1253,7 +1252,7 @@ def run_portfolio_tilupccu(portfolio, start_day=None, end_day=None, paper_tradin
         print("Error up/down move constants are not int or pb_limit (up/down[0]) is not within 0-2 inclusive or eps_limit (up/down[1]) is not within -30-30 inclusive")
         return portfolio
     DAYS = portfolio['constants']['days']
-    success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_to_avoid, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
+    success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
     if success_or_error == "Error":
         print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio, returning")
         return portfolio
@@ -1301,7 +1300,7 @@ def run_portfolio_tilupccu(portfolio, start_day=None, end_day=None, paper_tradin
                         if peer_tickers_basic_eps_fy_filtered and ((len([basic_eps_fy for basic_eps_fy in peer_tickers_basic_eps_fy_filtered if basic_eps_fy >= 0]) / len(peer_tickers_basic_eps_fy_filtered)) >= 0.5) and (pb_ttm <= PB_LIMIT) and (basic_eps >= EPS_LIMIT) and (top_interval_loser_ticker not in portfolio['open'].index): # ticker # [0] # maybe refactor industry considered strong if > 50% of similar companies have eps >= 0 # maybe add UP_MOVE for last_price_change
                             tickers_to_buy.append([top_interval_loser_ticker, last_price_change]) # top_interval_loser_ticker, last_price_change # tickers_to_buy.append([ticker, pb_fy]) # makes sense p/b remains p/b instead of (1-p/b) even though deceiving with rank_rise_d in portfolio dataframe when read portfolio type it's less confusing # p = 10 b = 100 => p/b = 0.1 and 0.9
                     if tickers_to_buy:
-                        portfolio = update_portfolio_buy_and_sell_tickers(portfolio=portfolio, tickers_to_buy=sorted(tickers_to_buy, key=lambda x: x[1], reverse=False) if custom_order else tickers_to_buy, tickers_to_sell=[], tickers_to_avoid=tickers_to_avoid, stop_day=stop_day, paper_trading=paper_trading, back_testing=back_testing) # tickers_to_buy
+                        portfolio = update_portfolio_buy_and_sell_tickers(portfolio=portfolio, tickers_to_buy=sorted(tickers_to_buy, key=lambda x: x[1], reverse=False) if custom_order else tickers_to_buy, tickers_to_sell=[], tickers_to_avoid=get_tickers_to_avoid(df_tickers_interval_stop, stop_day), stop_day=stop_day, paper_trading=paper_trading, back_testing=back_testing) # tickers_to_buy
         else:
             print("skipping " +  str(stop_day) + " since portfolio has already run on this date")
         stop_day = stop_day + timedelta(days=1)
@@ -1313,7 +1312,7 @@ def run_portfolio_tilupccu(portfolio, start_day=None, end_day=None, paper_tradin
 def run_portfolio_mmtv(portfolio, start_day=None, end_day=None, mmtv_sell=True, paper_trading=True, back_testing=False, limit_tickers=100, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 240, 'days': 15}, **params): # 04/24/2020 and 04/27/2020 doesn't have proper ranking, before 05/08/2020 only have S&P 500 Rank which is not Market Cap rank # maybe refactor rr_buy/sell to algo_buy/sell, especially if add more algorithms # , rr_buy=True
     print("running run_portfolio_mmtv()")
     # UP_MOVE, DOWN_MOVE = portfolio['constants']['up_down_move'], -portfolio['constants']['up_down_move']
-    success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_to_avoid, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
+    success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
     if success_or_error == "Error":
         print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio, returning")
         return portfolio
@@ -1357,7 +1356,7 @@ def run_portfolio_mmtv(portfolio, start_day=None, end_day=None, mmtv_sell=True, 
                     # for ticker in list(set(df_tickers_interval_start.index.values) - set(df_tickers_interval_stop.index.values)):
                     #     tickers_to_sell.append([ticker, df_tickers_interval_start.index.get_loc(df_tickers_interval_start.loc[ticker].name) - (len(df_tickers_interval_start) - DOWN_MOVE)])
                     if (tickers_to_buy or tickers_to_sell):
-                        portfolio = update_portfolio_buy_and_sell_tickers(portfolio=portfolio, tickers_to_buy=sorted(tickers_to_buy, key=lambda x: x[1], reverse=True), tickers_to_sell=tickers_to_sell, tickers_to_avoid=tickers_to_avoid, stop_day=stop_day, paper_trading=paper_trading, back_testing=back_testing)
+                        portfolio = update_portfolio_buy_and_sell_tickers(portfolio=portfolio, tickers_to_buy=sorted(tickers_to_buy, key=lambda x: x[1], reverse=True), tickers_to_sell=tickers_to_sell, tickers_to_avoid=get_tickers_to_avoid(df_tickers_interval_stop, stop_day), stop_day=stop_day, paper_trading=paper_trading, back_testing=back_testing)
         else:
             print("skipping " +  str(stop_day) + " since portfolio has already run on this date")
         stop_day = stop_day + timedelta(days=1)
@@ -1373,7 +1372,7 @@ def run_portfolio_random_sp500(portfolio, start_day=None, end_day=None, random_s
     if df_tickers_sp500.empty: # df_tickers_sp500.empty - precautionary should never be empty # df_tickers_interval_start.empty or df_tickers_interval_stop.empty or  # df_tickers_interval_stop.empty
         print("Error no df_tickers_sp500 cannot perform algorithm")
         return portfolio
-    success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_to_avoid, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
+    success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
     if success_or_error == "Error":
         print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio, returning")
         return portfolio
@@ -1422,7 +1421,7 @@ def run_portfolio_random_sp500(portfolio, start_day=None, end_day=None, random_s
                 #     tickers_to_sell.append([ticker, df_tickers_interval_start.index.get_loc(df_tickers_interval_start.loc[ticker].name) - (len(df_tickers_interval_start) - DOWN_MOVE)])
                 print("interval start date: " + str(interval_start_date) + ", interval stop: " + str(stop_day))
                 if (tickers_to_buy or tickers_to_sell):
-                    portfolio = update_portfolio_buy_and_sell_tickers(portfolio=portfolio, tickers_to_buy=tickers_to_buy, tickers_to_sell=tickers_to_sell, tickers_to_avoid=tickers_to_avoid, stop_day=stop_day, paper_trading=paper_trading, back_testing=back_testing)
+                    portfolio = update_portfolio_buy_and_sell_tickers(portfolio=portfolio, tickers_to_buy=tickers_to_buy, tickers_to_sell=tickers_to_sell, tickers_to_avoid={}, stop_day=stop_day, paper_trading=paper_trading, back_testing=back_testing) # not doing get_tickers_to_avoid(df_tickers_interval_stop, stop_day) since only buying sp500 tickers, need to refactor once I get a sp500 historical source and call it every day of the backtest
         else:
             print("skipping " +  str(stop_day) + " since portfolio has already run on this date")
         stop_day = stop_day + timedelta(days=DAYS)
@@ -1438,7 +1437,7 @@ def run_portfolio_random_sp500(portfolio, start_day=None, end_day=None, random_s
 def run_portfolio_mm(portfolio, start_day=None, end_day=None, paper_trading=True, back_testing=False, top_interval_gainers=100, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 240, 'days': 15}, **params): # not implementing tilupccu_sell since don't want to set DOWN_MOVE as (~0, might buy some very undervalued tickers), could add tilupccu_sell that acts like tsl if pb >= 1
     print("running run_portfolio_mm()")
     # UP_MOVE = portfolio['constants']['up_down_move'] # , DOWN_MOVE , -portfolio['constants']['up_down_move']
-    success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_to_avoid, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
+    success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
     if success_or_error == "Error":
         print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio, returning")
         return portfolio
@@ -1470,7 +1469,7 @@ def run_portfolio_mm(portfolio, start_day=None, end_day=None, paper_trading=True
                     for top_interval_gainer_ticker, last_price_change in tickers_with_last_price_change.most_common()[:top_interval_gainers]: # top_interval_loser_tickers = [ticker_tuple[0] for ticker_tuple in tickers_with_last_price_change.most_common()[-10:]] # maybe refactor (in testing didn't work out as well and more volatile) so top_interval_losers are ordered by most negative first: sorted(tickers_with_last_price_change.items(), key=lambda pair: pair[1], reverse=False)[:top_interval_losers]
                         tickers_to_buy.append([top_interval_gainer_ticker, last_price_change]) # top_interval_loser_ticker, last_price_change # tickers_to_buy.append([ticker, pb_fy]) # makes sense p/b remains p/b instead of (1-p/b) even though deceiving with rank_rise_d in portfolio dataframe when read portfolio type it's less confusing # p = 10 b = 100 => p/b = 0.1 and 0.9
                     if tickers_to_buy:
-                        portfolio = update_portfolio_buy_and_sell_tickers(portfolio=portfolio, tickers_to_buy=tickers_to_buy, tickers_to_sell=[], tickers_to_avoid=tickers_to_avoid, stop_day=stop_day, paper_trading=paper_trading, back_testing=back_testing) # tickers_to_buy # sorted(tickers_to_buy, key=lambda x: x[1], reverse=False) if custom_order else tickers_to_buy
+                        portfolio = update_portfolio_buy_and_sell_tickers(portfolio=portfolio, tickers_to_buy=tickers_to_buy, tickers_to_sell=[], tickers_to_avoid=get_tickers_to_avoid(df_tickers_interval_stop, stop_day), stop_day=stop_day, paper_trading=paper_trading, back_testing=back_testing) # tickers_to_buy # sorted(tickers_to_buy, key=lambda x: x[1], reverse=False) if custom_order else tickers_to_buy
         else:
             print("skipping " +  str(stop_day) + " since portfolio has already run on this date")
         stop_day = stop_day + timedelta(days=1)
@@ -1487,7 +1486,7 @@ def run_portfolio_ai_recommendations_in_sector(portfolio, start_day=None, end_da
     if ((not type(UP_MOVE) is int) or not (1 <= UP_MOVE <= 9)) or ((not type(DOWN_MOVE) is int) or not (1 <= DOWN_MOVE <= 9)) or (not type(SECTOR) is str): # [0]is higher rank threshold [1] is lower rank threshold [2] is sector can add check for sectors = list(df_tickers_interval_stop.Sector.unique()) but there is '' and None sectors so not checking
         print("Error up/down move constants[0,1] are not int or up/down[0,1] are not within 1-9 inclusive or up/down[2] is not a string")
         return portfolio
-    success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_to_avoid, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
+    success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
     if success_or_error == "Error":
         print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio, returning")
         return portfolio
@@ -1528,7 +1527,7 @@ def run_portfolio_ai_recommendations_in_sector(portfolio, start_day=None, end_da
                         except Exception as e:
                             print(str(e) + " - Unable to execute, " + ticker + " issues with buy or not analysis content or investment recommendation on company name: " + company_name + " on: " + stop_day.strftime('%Y-%m-%d'))
                     if (tickers_to_buy or tickers_to_sell):
-                        portfolio = update_portfolio_buy_and_sell_tickers(portfolio=portfolio, tickers_to_buy=tickers_to_buy, tickers_to_sell=tickers_to_sell, tickers_to_avoid=tickers_to_avoid, stop_day=stop_day, paper_trading=paper_trading, back_testing=back_testing)
+                        portfolio = update_portfolio_buy_and_sell_tickers(portfolio=portfolio, tickers_to_buy=tickers_to_buy, tickers_to_sell=tickers_to_sell, tickers_to_avoid=get_tickers_to_avoid(df_tickers_interval_stop, stop_day), stop_day=stop_day, paper_trading=paper_trading, back_testing=back_testing)
         else:
             print("skipping " +  str(stop_day) + " since portfolio has already run on this date")
         stop_day = stop_day + timedelta(days=1)
@@ -1545,7 +1544,7 @@ def run_portfolio_top_n_gainers_ai_analysis(portfolio, start_day=None, end_day=N
     if ((not type(UP_MOVE) is int) or not (1 <= UP_MOVE <= 9)) or ((not type(DOWN_MOVE) is int) or not (1 <= DOWN_MOVE <= 9)): # [0]is higher rank threshold [1] is lower rank threshold
         print("Error up/down move constants[0,1] are not an int or up/down[0,1] are not within 1-9 inclusive")
         return portfolio
-    success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_to_avoid, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
+    success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
     if success_or_error == "Error":
         print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio, returning")
         return portfolio
@@ -1584,7 +1583,7 @@ def run_portfolio_top_n_gainers_ai_analysis(portfolio, start_day=None, end_day=N
                         except Exception as e:
                             print(str(e) + " - Unable to execute, " + ticker + " issues with ticker in df_tickers_interval_stop or buy or not analysis content or investment recommendation on: " + stop_day.strftime('%Y-%m-%d'))
                     if (tickers_to_buy or tickers_to_sell):
-                        portfolio = update_portfolio_buy_and_sell_tickers(portfolio=portfolio, tickers_to_buy=tickers_to_buy, tickers_to_sell=tickers_to_sell, tickers_to_avoid=tickers_to_avoid, stop_day=stop_day, paper_trading=paper_trading, back_testing=back_testing)
+                        portfolio = update_portfolio_buy_and_sell_tickers(portfolio=portfolio, tickers_to_buy=tickers_to_buy, tickers_to_sell=tickers_to_sell, tickers_to_avoid=get_tickers_to_avoid(df_tickers_interval_stop, stop_day), stop_day=stop_day, paper_trading=paper_trading, back_testing=back_testing) # get_tickers_to_avoid(df_tickers_interval_stop, stop_day) precautionary
         else:
             print("skipping " +  str(stop_day) + " since portfolio has already run on this date")
         stop_day = stop_day + timedelta(days=1)
@@ -1625,7 +1624,7 @@ def run_portfolio_senate_trading(portfolio, start_day=None, end_day=None, senate
         if df_tickers_sp500.empty or senate_timestamps_and_tickers_inflows_and_outflows.empty: # df_tickers_sp500.empty - precautionary should never be empty # df_tickers_interval_start.empty or df_tickers_interval_stop.empty or  # df_tickers_interval_stop.empty
             print("Error no df_tickers_sp500 or senate_timestamps_and_tickers_inflows_and_outflows cannot perform algorithm")
             return portfolio
-    success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_to_avoid, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
+    success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
     if success_or_error == "Error":
         print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio, returning")
         return portfolio
@@ -1656,7 +1655,7 @@ def run_portfolio_senate_trading(portfolio, start_day=None, end_day=None, senate
                     elif senate_trading_sell and (ticker in portfolio['open'].index) and (portfolio['open'].loc[ticker, 'trade_notes'] in ["Filled", "~Filled", None]) and (amount_fixed < 0):
                         tickers_to_sell.append([ticker, amount_fixed])
                 if (tickers_to_buy or tickers_to_sell):
-                    portfolio = update_portfolio_buy_and_sell_tickers(portfolio=portfolio, tickers_to_buy=tickers_to_buy, tickers_to_sell=tickers_to_sell, tickers_to_avoid=tickers_to_avoid, stop_day=stop_day, paper_trading=paper_trading, back_testing=back_testing)
+                    portfolio = update_portfolio_buy_and_sell_tickers(portfolio=portfolio, tickers_to_buy=tickers_to_buy, tickers_to_sell=tickers_to_sell, tickers_to_avoid={}, stop_day=stop_day, paper_trading=paper_trading, back_testing=back_testing) # not doing get_tickers_to_avoid(df_tickers_interval_stop, stop_day) since only buying sp500 tickers, need to refactor once I get a sp500 historical source and call it every day of the backtest
         else:
             print("skipping " +  str(stop_day) + " since portfolio has already run on this date")
         stop_day = stop_day + timedelta(days=DAYS)
@@ -1675,7 +1674,7 @@ def run_portfolio_sma_mm(portfolio, start_day=None, end_day=None, sma_mm_sell=Tr
     if UP_DOWN_MOVE not in sma_mm_algos:
         print("Error up/down move is not in list of allowed algorithms: " + str(sma_mm_algos))
         return portfolio
-    success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_to_avoid, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, False, **params)
+    success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, False, **params)
     if success_or_error == "Error":
         print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio, returning")
         return portfolio
@@ -1700,7 +1699,7 @@ def run_portfolio_sma_mm(portfolio, start_day=None, end_day=None, sma_mm_sell=Tr
                     tickers_to_sell.append([ticker, price_differential])
                     print(ticker + ": to sell, price_avg_5: " + str(price_avg_5) + ", price_avg_8: " + str(price_avg_8) + ", price_avg_13: " + str(price_avg_13))
         if tickers_to_sell:
-            portfolio = update_portfolio_buy_and_sell_tickers(portfolio=portfolio, tickers_to_buy=[], tickers_to_sell=tickers_to_sell, tickers_to_avoid=tickers_to_avoid, stop_day=stop_day, paper_trading=paper_trading, back_testing=False)
+            portfolio = update_portfolio_buy_and_sell_tickers(portfolio=portfolio, tickers_to_buy=[], tickers_to_sell=tickers_to_sell, tickers_to_avoid={}, stop_day=stop_day, paper_trading=paper_trading, back_testing=False)
         return portfolio
     # add logic for UP_MOVE, DOWN_MOVE = portfolio['constants']['up_down_move']
     # if sma_mm_sell or (portfolio['balance']['usd'] >= portfolio['constants']['usd_invest_min']):
@@ -1752,7 +1751,7 @@ def run_portfolio_sma_mm(portfolio, start_day=None, end_day=None, sma_mm_sell=Tr
                     print(ticker + ", " + str(df_tickers_interval_stop.loc[ticker, 'Name (Alpaca)']) + ": to sell, price_avg_5: " + str(price_avg_5) + ", price_avg_8: " + str(price_avg_8) + ", price_avg_13: " + str(price_avg_13) + ", count: " + str(count))
     print("Execution time: " + str(time.time() - start_time))
     if (tickers_to_buy or tickers_to_sell):
-        portfolio = update_portfolio_buy_and_sell_tickers(portfolio=portfolio, tickers_to_buy=tickers_to_buy, tickers_to_sell=tickers_to_sell, tickers_to_avoid=tickers_to_avoid, stop_day=stop_day, paper_trading=paper_trading, back_testing=False)
+        portfolio = update_portfolio_buy_and_sell_tickers(portfolio=portfolio, tickers_to_buy=tickers_to_buy, tickers_to_sell=tickers_to_sell, tickers_to_avoid=get_tickers_to_avoid(df_tickers_to_iterate, interval_stop_date), stop_day=stop_day, paper_trading=paper_trading, back_testing=False)
     return portfolio
 
 # function required for markets with high traffic volume / trading on multiple exchanges, refactor (so that buy positions of closed orders is included) or refactor frequency of calls if implement higher frequency trading (expect buying and selling within 1 hour)
