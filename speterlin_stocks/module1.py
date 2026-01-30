@@ -42,7 +42,7 @@ __all__ = [
     "get_ticker_data_fmp",
     "get_ticker_balance_sheet_data_fmp",
     "get_ticker_stock_news_articles_fmp",
-    "get_daily_stock_gainers_fmp",
+    "get_daily_stock_gainers_or_losers_fmp",
     "get_tickers_with_stock_splits_in_85_days_period_fmp",
     "get_tickers_with_stock_splits_in_period_fmp",
     "get_tickers_with_stock_splits_fmp",
@@ -63,7 +63,7 @@ __all__ = [
     "get_saved_tickers_data",
     # "save_usa_tv_tickers_zacks_data",
     "save_tickers_yf_and_fmp_or_gf_data",
-    "save_tickers_daily_gainers_fmp",
+    "save_tickers_daily_gainers_or_losers_fmp",
     "save_usa_alpaca_tickers_fmp_or_gf_data",
     # "get_crunchbase_search_permalinks",
     # "get_crunchbase_permalink_site_check_ticker",
@@ -274,11 +274,11 @@ def get_ticker_stock_news_articles_fmp(ticker, limit=5): # maybe refactor add re
     df = df.dropna(how="any") # drops missing values
     return df
 
-def get_daily_stock_gainers_fmp(): # maybe refactor add real_time to name
+def get_daily_stock_gainers_or_losers_fmp(gainers_or_losers="gainers"): # maybe refactor add real_time to name
     # global FMP_API_KEY
     data = []
     session = requests.Session()
-    request = f"https://financialmodelingprep.com/api/v3/stock_market/gainers?\
+    request = f"https://financialmodelingprep.com/api/v3/stock_market/{gainers_or_losers}?\
                 &apikey={FMP_API_KEY}".replace(" ", "")
     r = session.get(request)
     if r.status_code == requests.codes.ok:
@@ -661,8 +661,8 @@ def save_tickers_yf_and_fmp_or_gf_data(df_tickers, date, additions=[]): # date i
     pd.to_pickle(df_tickers, f)
     f.close()
 
-def save_tickers_daily_gainers_fmp(df_tickers, date, additions=[]): # date is in format '%Y-%m-%d'
-    f = open('data/stocks/saved_tickers_data/' + 'usa_gainers_fmp' + ('_and_' + '_'.join(additions) if additions else '') + '/tickers_' + '_'.join(additions) + '_' + date + '.pckl', 'wb') # date instead of datetime.now() since process takes a while can extend into next day when data is not for the next day
+def save_tickers_daily_gainers_or_losers_fmp(gainers_or_losers, df_tickers, date, additions=[]): # date is in format '%Y-%m-%d'
+    f = open('data/stocks/saved_tickers_data/' + 'usa_' + gainers_or_losers + '_fmp' + ('_and_' + '_'.join(additions) if additions else '') + '/tickers_' + '_'.join(additions) + '_' + date + '.pckl', 'wb') # date instead of datetime.now() since process takes a while can extend into next day when data is not for the next day
     pd.to_pickle(df_tickers, f)
     f.close()
 
@@ -1273,6 +1273,9 @@ def run_portfolio_tilupccu(portfolio, start_day=None, end_day=None, paper_tradin
                 if not (df_tickers_interval_start.empty or df_tickers_interval_stop.empty): # df_tickers_interval_stop.empty
                     df_tickers_interval_start, df_tickers_interval_stop = df_tickers_interval_start[df_tickers_interval_start['Market Cap'] > 0].sort_values('Market Cap', ascending=False, inplace=False), df_tickers_interval_stop[df_tickers_interval_stop['Market Cap'] > 0].sort_values('Market Cap', ascending=False, inplace=False) # assuming df_tickers_interval_stop aligned with df_tickers_last_quality_data (Market Cap > 0) # maybe refactor and only deal with equities (not ETFs, etc.)
                     tickers_to_buy = [] # Counter()
+                    df_tickers_daily_losers = _fetch_data(get_daily_stock_gainers_or_losers_fmp, params={'gainers_or_losers': 'losers'}, error_str=" - Issues with today's stock losers from FMP on: " + str(datetime.now()), empty_data = pd.DataFrame())
+                    if not back_testing:
+                        save_tickers_daily_gainers_or_losers_fmp("losers", df_tickers_daily_losers, stop_day.strftime('%Y-%m-%d'))
                     tickers_with_last_price_change = Counter()
                     for ticker in df_tickers_interval_stop.index: # (df_tickers_interval_stop if stop_day.date() < datetime.strptime('2020-05-08', '%Y-%m-%d').date() else df_tickers_interval_stop[df_tickers_interval_stop['Market Cap'] >= 2e9]).index: # df_tickers_interval_stop # if want to deal only with Mega, Large, Mid-Cap companies since smaller companies could cause complications with exchange listings etc. (but not on alpaca), S&P 500 tickers from 04/24/2020 until 05/08/2020
                         # if df_tickers_interval_stop.loc[ticker, 'Industry'] == 'Biotechnology': # if add sector(s) constaint(s)
@@ -1559,9 +1562,9 @@ def run_portfolio_top_n_gainers_ai_analysis(portfolio, start_day=None, end_day=N
             if tngaia_sell or (portfolio['balance']['usd'] >= portfolio['constants']['usd_invest_min']):
                 df_tickers_interval_stop = get_saved_tickers_data(date=stop_day.strftime('%Y-%m-%d'))
                 df_tickers_interval_stop = df_tickers_interval_stop[df_tickers_interval_stop['Market Cap'] > 0].sort_values('Market Cap', ascending=False, inplace=False)
-                df_tickers_daily_gainers = _fetch_data(get_daily_stock_gainers_fmp, params={}, error_str=" - Issues with stock gainers from FMP on: " + str(datetime.now()), empty_data = pd.DataFrame())
+                df_tickers_daily_gainers = _fetch_data(get_daily_stock_gainers_or_losers_fmp, params={}, error_str=" - Issues with today's stock gainers from FMP on: " + str(datetime.now()), empty_data = pd.DataFrame())
                 if not back_testing:
-                    save_tickers_daily_gainers_fmp(df_tickers_daily_gainers, stop_day.strftime('%Y-%m-%d'))
+                    save_tickers_daily_gainers_or_losers_fmp("gainers", df_tickers_daily_gainers, stop_day.strftime('%Y-%m-%d'))
                 if not (df_tickers_interval_stop.empty or df_tickers_daily_gainers.empty):
                     # refactor and add logic for dealing with if zacks rank is in  df_tickers_interval_start/stop
                     tickers_to_buy, tickers_to_sell = [], [] # Counter(), Counter()

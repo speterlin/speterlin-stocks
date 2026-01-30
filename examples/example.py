@@ -173,15 +173,15 @@ for portfolio_name, portfolio in portfolios.items():
     print(portfolio_name + ", USD Value: " + str(portfolio_usd_value) + ", USD Value Growth: " + str(portfolio_usd_value_growth))
 
 # RUN single portfolio
-portfolio_fmpr_test = stocks.run_portfolio(portfolio=portfolio_fmpr_test, start_day=start_day, end_day=end_day, paper_trading=paper_trading, back_testing=back_testing, add_pauses_to_avoid_unsolved_error=add_pauses_to_avoid_unsolved_error, tickers_with_stock_splits=tickers_with_stock_splits, tickers_to_avoid=tickers_to_avoid)
+portfolio_tilupccu_test = stocks.run_portfolio(portfolio=portfolio_tilupccu_test, start_day=start_day, end_day=end_day, paper_trading=paper_trading, back_testing=back_testing, add_pauses_to_avoid_unsolved_error=add_pauses_to_avoid_unsolved_error, tickers_with_stock_splits=tickers_with_stock_splits) # , tickers_to_avoid=tickers_to_avoid)
 
 # CHECK ROI of single portfolio
-portfolio_usd_value = portfolio_fmpr_test['balance']['usd']
-for ticker in portfolio_fmpr_test['open'].index:
-    portfolio_usd_value += portfolio_fmpr_test['open'].loc[ticker, 'current_price']*portfolio_fmpr_test['open'].loc[ticker, 'balance']
+portfolio_usd_value = portfolio_tilupccu_test['balance']['usd']
+for ticker in portfolio_tilupccu_test['open'].index:
+    portfolio_usd_value += portfolio_tilupccu_test['open'].loc[ticker, 'current_price']*portfolio_tilupccu_test['open'].loc[ticker, 'balance']
 
-portfolio_usd_value_growth = (portfolio_usd_value - portfolio_fmpr_test['constants']['start_balance']['usd']) / portfolio_fmpr_test['constants']['start_balance']['usd']
+portfolio_usd_value_growth = (portfolio_usd_value - portfolio_tilupccu_test['constants']['start_balance']['usd']) / portfolio_tilupccu_test['constants']['start_balance']['usd']
 
 # INSPECT OUTCOME of single portfolio
-portfolio_fmpr_test['sold'].sort_values('roi', inplace=False, ascending=False)[['ticker', 'buy_date', 'buy_price', 'balance', 'rank_rise_d', 'sell_date', 'sell_price', 'roi', 'other_notes']]
-portfolio_fmpr_test['open'].sort_values('current_roi', inplace=False, ascending=False)[['buy_date', 'buy_price', 'balance', 'rank_rise_d', 'current_date', 'current_price', 'current_roi', 'other_notes']]
+portfolio_tilupccu_test['sold'].sort_values('roi', inplace=False, ascending=False)[['ticker', 'buy_date', 'buy_price', 'balance', 'rank_rise_d', 'sell_date', 'sell_price', 'roi', 'other_notes']]
+portfolio_tilupccu_test['open'].sort_values('current_roi', inplace=False, ascending=False)[['buy_date', 'buy_price', 'balance', 'rank_rise_d', 'current_date', 'current_price', 'current_roi', 'other_notes']]
