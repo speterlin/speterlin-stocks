@@ -939,7 +939,7 @@ def update_portfolio_postions_back_testing(portfolio, stop_day, end_day, **param
                 for idx in stock_split_idxs: # for ticker_with_stock_split_dict in tickers_with_stock_splits[ticker]:
                     ex_date = datetime.strptime(df_stock_splits.loc[idx, 'date'], '%Y-%m-%d')
                     prev_ex_date = prev_ex_date if prev_ex_date else (ex_date - timedelta(days=41))
-                    if stop_day.date() < ex_date.date(): # if stop_day.date() < ticker_with_stock_split_dict['ex_date'].date():
+                    if stop_day.date() <= ex_date.date(): # if stop_day.date() < ticker_with_stock_split_dict['ex_date'].date():
                         split_ratio = df_stock_splits.loc[idx, 'denominator'] / df_stock_splits.loc[idx, 'numerator'] # # print(str(prev_ex_date) + ": " + str(ex_date) + ", " + str(prev_split_ratio) + ": " + str(split_ratio))
                         if (prev_split_ratio != split_ratio) and (ex_date >= prev_ex_date + timedelta(days=40)): # dates are in chronological order # 40 day buffer to prevent duplicates? - don't think any credible company would split same ratio within 40 day period # and (ex_date >= prev_ex_date + timedelta(days=10))
                             divide_factor *= split_ratio # (df_stock_splits.loc[idx, 'numerator'] / df_stock_splits.loc[idx, 'denominator']) # divide_factor *= ticker_with_stock_split_dict['split_ratio']
@@ -996,7 +996,7 @@ def update_portfolio_postions_back_testing(portfolio, stop_day, end_day, **param
 
 # Can't trade ADR|ADS or Warrants on Alpaca, potentially refactor add case insensitive and whole word matching
 def get_tickers_to_avoid_in_alpaca(df_usa_alpaca_tickers_of_the_day): # usa_alpaca_tickers_end_with_y_with_no_current_alpaca_trade_data
-    print("Running get_tickers_to_avoid_in_alpaca()")
+    print("running get_tickers_to_avoid_in_alpaca()")
     adr_ads_warrant_tickers = {}
     if (not type(df_usa_alpaca_tickers_of_the_day) is pd.core.frame.DataFrame) or df_usa_alpaca_tickers_of_the_day.empty:
         print("Must pass a non-empty dataframe as parameter")
@@ -1242,7 +1242,7 @@ def run_portfolio_rr(portfolio, start_day=None, end_day=None, rr_sell=True, pape
             stop_day = stop_day + timedelta(days=1)
     return portfolio
 
-def run_portfolio_tilupccu(portfolio, start_day=None, end_day=None, paper_trading=True, back_testing=False, top_interval_losers=100, custom_order=True, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 240, 'days': 15}, **params): # not implementing tilupccu_sell since don't want to set DOWN_MOVE as (~0, might buy some very undervalued tickers), could add tilupccu_sell that acts like tsl if pb >= 1
+def run_portfolio_tilupccu(portfolio, start_day=None, end_day=None, paper_trading=True, back_testing=False, top_interval_losers=100, custom_buy_order={'engaged': True, 'descending': False}, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 240, 'days': 15}, **params): # not implementing tilupccu_sell since don't want to set DOWN_MOVE as (~0, might buy some very undervalued tickers), could add tilupccu_sell that acts like tsl if pb >= 1
     print("running run_portfolio_tilupccu()")
     if (not type(portfolio['constants']['up_down_move']) is list) or len(portfolio['constants']['up_down_move']) != 2:
         print("Error up/down move constant is not a list or a list with length 2")
@@ -1303,7 +1303,7 @@ def run_portfolio_tilupccu(portfolio, start_day=None, end_day=None, paper_tradin
                         if peer_tickers_basic_eps_fy_filtered and ((len([basic_eps_fy for basic_eps_fy in peer_tickers_basic_eps_fy_filtered if basic_eps_fy >= 0]) / len(peer_tickers_basic_eps_fy_filtered)) >= 0.5) and (pb_ttm <= PB_LIMIT) and (basic_eps >= EPS_LIMIT) and (top_interval_loser_ticker not in portfolio['open'].index): # ticker # [0] # maybe refactor industry considered strong if > 50% of similar companies have eps >= 0 # maybe add UP_MOVE for last_price_change
                             tickers_to_buy.append([top_interval_loser_ticker, last_price_change]) # top_interval_loser_ticker, last_price_change # tickers_to_buy.append([ticker, pb_fy]) # makes sense p/b remains p/b instead of (1-p/b) even though deceiving with rank_rise_d in portfolio dataframe when read portfolio type it's less confusing # p = 10 b = 100 => p/b = 0.1 and 0.9
                     if tickers_to_buy:
-                        portfolio = update_portfolio_buy_and_sell_tickers(portfolio=portfolio, tickers_to_buy=sorted(tickers_to_buy, key=lambda x: x[1], reverse=False) if custom_order else tickers_to_buy, tickers_to_sell=[], tickers_to_avoid=get_tickers_to_avoid(df_tickers_interval_stop, stop_day), stop_day=stop_day, paper_trading=paper_trading, back_testing=back_testing) # tickers_to_buy
+                        portfolio = update_portfolio_buy_and_sell_tickers(portfolio=portfolio, tickers_to_buy=sorted(tickers_to_buy, key=lambda x: x[1], reverse=custom_buy_order['descending']) if custom_buy_order['engaged'] else tickers_to_buy, tickers_to_sell=[], tickers_to_avoid=get_tickers_to_avoid(df_tickers_interval_stop, stop_day), stop_day=stop_day, paper_trading=paper_trading, back_testing=back_testing) # tickers_to_buy
         else:
             print("skipping " +  str(stop_day) + " since portfolio has already run on this date")
         stop_day = stop_day + timedelta(days=1)
@@ -1312,7 +1312,7 @@ def run_portfolio_tilupccu(portfolio, start_day=None, end_day=None, paper_tradin
     return portfolio
 
 # Long backtesting time needs refactoring
-def run_portfolio_mmtv(portfolio, start_day=None, end_day=None, mmtv_sell=True, paper_trading=True, back_testing=False, limit_tickers=100, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 240, 'days': 15}, **params): # 04/24/2020 and 04/27/2020 doesn't have proper ranking, before 05/08/2020 only have S&P 500 Rank which is not Market Cap rank # maybe refactor rr_buy/sell to algo_buy/sell, especially if add more algorithms # , rr_buy=True
+def run_portfolio_mmtv(portfolio, start_day=None, end_day=None, mmtv_sell=True, paper_trading=True, back_testing=False, limit_tickers=100, custom_buy_order={'engaged': True, 'descending': True}, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 240, 'days': 15}, **params): # 04/24/2020 and 04/27/2020 doesn't have proper ranking, before 05/08/2020 only have S&P 500 Rank which is not Market Cap rank # maybe refactor rr_buy/sell to algo_buy/sell, especially if add more algorithms # , rr_buy=True
     print("running run_portfolio_mmtv()")
     # UP_MOVE, DOWN_MOVE = portfolio['constants']['up_down_move'], -portfolio['constants']['up_down_move']
     success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
@@ -1359,7 +1359,7 @@ def run_portfolio_mmtv(portfolio, start_day=None, end_day=None, mmtv_sell=True, 
                     # for ticker in list(set(df_tickers_interval_start.index.values) - set(df_tickers_interval_stop.index.values)):
                     #     tickers_to_sell.append([ticker, df_tickers_interval_start.index.get_loc(df_tickers_interval_start.loc[ticker].name) - (len(df_tickers_interval_start) - DOWN_MOVE)])
                     if (tickers_to_buy or tickers_to_sell):
-                        portfolio = update_portfolio_buy_and_sell_tickers(portfolio=portfolio, tickers_to_buy=sorted(tickers_to_buy, key=lambda x: x[1], reverse=True), tickers_to_sell=tickers_to_sell, tickers_to_avoid=get_tickers_to_avoid(df_tickers_interval_stop, stop_day), stop_day=stop_day, paper_trading=paper_trading, back_testing=back_testing)
+                        portfolio = update_portfolio_buy_and_sell_tickers(portfolio=portfolio, tickers_to_buy=sorted(tickers_to_buy, key=lambda x: x[1], reverse=custom_buy_order['descending']) if custom_buy_order['engaged'] else tickers_to_buy, tickers_to_sell=tickers_to_sell, tickers_to_avoid=get_tickers_to_avoid(df_tickers_interval_stop, stop_day), stop_day=stop_day, paper_trading=paper_trading, back_testing=back_testing)
         else:
             print("skipping " +  str(stop_day) + " since portfolio has already run on this date")
         stop_day = stop_day + timedelta(days=1)
@@ -1472,7 +1472,7 @@ def run_portfolio_mm(portfolio, start_day=None, end_day=None, paper_trading=True
                     for top_interval_gainer_ticker, last_price_change in tickers_with_last_price_change.most_common()[:top_interval_gainers]: # top_interval_loser_tickers = [ticker_tuple[0] for ticker_tuple in tickers_with_last_price_change.most_common()[-10:]] # maybe refactor (in testing didn't work out as well and more volatile) so top_interval_losers are ordered by most negative first: sorted(tickers_with_last_price_change.items(), key=lambda pair: pair[1], reverse=False)[:top_interval_losers]
                         tickers_to_buy.append([top_interval_gainer_ticker, last_price_change]) # top_interval_loser_ticker, last_price_change # tickers_to_buy.append([ticker, pb_fy]) # makes sense p/b remains p/b instead of (1-p/b) even though deceiving with rank_rise_d in portfolio dataframe when read portfolio type it's less confusing # p = 10 b = 100 => p/b = 0.1 and 0.9
                     if tickers_to_buy:
-                        portfolio = update_portfolio_buy_and_sell_tickers(portfolio=portfolio, tickers_to_buy=tickers_to_buy, tickers_to_sell=[], tickers_to_avoid=get_tickers_to_avoid(df_tickers_interval_stop, stop_day), stop_day=stop_day, paper_trading=paper_trading, back_testing=back_testing) # tickers_to_buy # sorted(tickers_to_buy, key=lambda x: x[1], reverse=False) if custom_order else tickers_to_buy
+                        portfolio = update_portfolio_buy_and_sell_tickers(portfolio=portfolio, tickers_to_buy=tickers_to_buy, tickers_to_sell=[], tickers_to_avoid=get_tickers_to_avoid(df_tickers_interval_stop, stop_day), stop_day=stop_day, paper_trading=paper_trading, back_testing=back_testing) # tickers_to_buy # sorted(tickers_to_buy, key=lambda x: x[1], reverse=False) if custom_buy_order else tickers_to_buy
         else:
             print("skipping " +  str(stop_day) + " since portfolio has already run on this date")
         stop_day = stop_day + timedelta(days=1)
