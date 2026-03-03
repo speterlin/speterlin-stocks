@@ -1615,7 +1615,7 @@ def senate_timestamps_and_tickers_inflows_and_outflows_by_month_for_stocks(stock
 
 def run_portfolio_senate_trading(portfolio, start_day=None, end_day=None, senate_trading_sell=True, paper_trading=True, back_testing=False, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 240, 'days': 15}, **params): # maybe refactor and add sp500 and month to name
     print("running run_portfolio_senate_trading()")
-    if (not type(portfolio['constants']['up_down_move']) is int) or not (1 <= portfolio['constants']['up_down_move'] <= 5): # [0]is higher rank threshold [1] is lower rank threshold
+    if (not type(portfolio['constants']['up_down_move']) is int) or not (1 <= portfolio['constants']['up_down_move'] <= 50): # [0]is higher rank threshold [1] is lower rank threshold
         print("Error up/down move constant is not an int or not within 1-5 inclusive")
         return portfolio
     RANK_LIMIT = portfolio['constants']['up_down_move']
