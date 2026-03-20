@@ -58,7 +58,7 @@ __all__ = [
     # "should_I_buy_the_stock_openai",
     "should_I_buy_the_stock_google_gemini_pro",
     "extract_investment_recommendation",
-    "extract_investment_recommendation_2",
+    # "extract_investment_recommendation_2",
     "get_google_trends_pt", # replaces "get_cryptory",
     "get_saved_tickers_data",
     # "save_usa_tv_tickers_zacks_data",
@@ -576,10 +576,10 @@ def should_I_buy_the_stock_google_gemini_pro(ticker, company_name, location=None
 def extract_investment_recommendation(analysis, ticker):
     start_time = time.time()
     try:
-        rating = float(re.findall(r"[2-9]", re.split("[C|c]onclusion|[R|r]ecommend[ation]{0,1}|[O|o]verall", analysis.text)[-1])[0]) # maybe add ^ed for recommend |[R|r]at[e|ed|ing] # here and below excluding 0,1,10 outliers (extremely low or high recommendation) (also conflicts with AI response 'on a scale of 1-10'/'out of 1/10' etc
+        rating = float(re.search(r"([1-9]|10)\.?[0-9]?\s?/\s?10", analysis.text)[0].split("/")[0]) # re.findall(r"[1-10]", [0]) # maybe add ^ed for recommend |[R|r]at[e|ed|ing] # here and below excluding 0,1,10 outliers (extremely low or high recommendation) (also conflicts with AI response 'on a scale of 1-10'/'out of 1/10' etc
     except Exception as e:
         print(str(e) + " - No (or issue with extracting) investment recommendation for: " + ticker + " on: " + str(datetime.now()) + ", Execution time: " + str(time.time() - start_time))
-        rating = 0
+        rating = float("NaN")
     print("Execution time: " + str(time.time() - start_time))
     # rating = float(re.findall(r"[0-9]{1,2}" + " out of 10", analysis.text)[0].split()[0]) if re.findall(r"[0-9]{1,2}" + " out of 10", analysis.text) else float("NaN")
     # rating = google_gemini_pro_model.generate_content(f"Given the Google Gemini Pro analysis, what is the numeric investment recommendation on a scale of 1-10 of the company stock ticker ?: {analysis.text}?")
@@ -588,11 +588,11 @@ def extract_investment_recommendation(analysis, ticker):
 def extract_investment_recommendation_2(analysis, ticker):
     start_time = time.time()
     try:
-        rating = float(re.findall(r"[2-9]", re.split(r"\srate\s|\srated\s|\srating\s", analysis.text)[-1])[0]) # \s[R|r]at[e|ed|ing]\s
+        rating = float(re.search(r"\s?(?:[R|r]ating:\s|[S|s]core:\s)([1-9]|10)\.?[0-9]?", analysis.text)[0].split(":")[-1]) # re.findall(r"([1-9]|10)\.?[0-9]?", re.split [2-9] |\\s [-1] # \s[R|r]at[e|ed|ing]\s
     except Exception as e:
         print(str(e) + " - No (or issue with extracting) investment recommendation for: " + ticker + " on: " + str(datetime.now()) + ", Execution time: " + str(time.time() - start_time))
         # rating = float(re.findall(r"[2-9]", re.split("[R|r]at[e|ed|ing]", analysis.text)[-1])[0])
-        rating = 0
+        rating = float("NaN")
     print("Execution time: " + str(time.time() - start_time))
     # rating = float(re.findall(r"[0-9]{1,2}" + " out of 10", analysis.text)[0].split()[0]) if re.findall(r"[0-9]{1,2}" + " out of 10", analysis.text) else float("NaN")
     # rating = google_gemini_pro_model.generate_content(f"Given the Google Gemini Pro analysis, what is the numeric investment recommendation on a scale of 1-10 of the company stock ticker ?: {analysis.text}?")
@@ -885,6 +885,8 @@ def alpaca_trade_ticker(ticker, side, usd_invest=None, quantity=None, price=None
         print("Potential lag in Alpaca open order creation - waiting " + str(open_time) + " seconds and checking again for open orders after order submitted")
         time.sleep(open_time)
         open_orders_for_ticker_at_present = [open_order for open_order in _fetch_data(alpaca_api.list_orders, params={'status': 'open', 'nested': True}, error_str=" - Alpaca open orders error on: " + str(datetime.now()), empty_data=[]) if (open_order.symbol == ticker) and ((datetime.now() - timedelta(minutes=1)) <= datetime.fromtimestamp(datetime.timestamp(open_order.created_at)) <= (datetime.now() + timedelta(minutes=1)))]
+    if open_orders_for_ticker_at_present and open_orders_for_ticker_at_present[0].status == 'rejected':
+        return [quantity, price, {}, [], "ATrade Error"]
     trade_notes = 'Filled' if (float(order.filled_qty) and not open_orders_for_ticker_at_present) else 'Not filled' if (not float(order.filled_qty) and open_orders_for_ticker_at_present and not float(open_orders_for_ticker_at_present[0].filled_qty)) else 'Partially filled' if ((float(order.filled_qty) and open_orders_for_ticker_at_present) or (open_orders_for_ticker_at_present and float(open_orders_for_ticker_at_present[0].filled_qty))) else "~Filled" # ()'symbol' == ticker)->[0] since already filtered above if len>1 (which is an alpaca error) first instance should be the right open order # refactor "Not Filled" / "Partially filled" to something like (open_orders_for_ticker_at_present and not float(open_orders_for_ticker_at_present[0].filled_qty)) / (open_orders_for_ticker_at_present and float(open_orders_for_ticker_at_present[0].filled_qty)) # (quantity - float(order.filled_qty) == 0), ((quantity - float(order.filled_qty) == quantity) and any(open_orders_for_ticker_at_present))
     message_body = "Q Trading @stocks #" + portfolio_account + ": " + ticker + " " + side + " at price $" + str(price) + " and quantity " + str(quantity) + ", " + str(other_notes) + ", " + trade_notes + (" :)" if trade_notes == "Filled" else " :/" if trade_notes == "Partially filled" else " :(") + ", at: " + str(datetime.now())
     color_start, color_end = ["\033[92m", "\033[0m"] if trade_notes in ["Filled", "~Filled"] else ["\033[33m", "\033[0m"] if trade_notes == "Partially filled" else ["\033[91m", "\033[0m"] # ["\033[94m", "\033[0m"] if paper_trading else # blue for paper_trading, maybe refactor and add other color to function calls # green yellow red # last condition is if "Not filled" or "ATrade Error"
@@ -1519,7 +1521,7 @@ def run_portfolio_ai_recommendations_in_sector(portfolio, start_day=None, end_da
                             # maybe refactor inside of a try statement no need for _fetch_data()
                             buy_or_not_analysis = should_I_buy_the_stock_google_gemini_pro(ticker, company_name, location) # f"Is it a good time to buy {company_name}?"
                             rating = extract_investment_recommendation(buy_or_not_analysis, ticker) # , tokens_used # rating = float(re.findall(r"[0-9]{1,2}" + "S[out of 10|on a scale of 1-10]", buy_or_not_analysis.content)[0].split()[0]) if re.findall(r"[0-9]{1,2}" + " out of 10", buy_or_not_analysis.content) else float("NaN")
-                            rating = rating if rating else extract_investment_recommendation_2(buy_or_not_analysis, ticker)
+                            # rating = rating if rating else extract_investment_recommendation_2(buy_or_not_analysis, ticker)
                             print(ticker + ": " + str(rating))
                             if (ticker not in portfolio['open'].index) and (rating >= UP_MOVE): # care if ticker has just turned to buy # convenient since if 'Zacks Rank' is None conditional expression returns False instead of returning an error and continues, much faster
                                 print(ticker + ": " + " buying")
@@ -1575,7 +1577,7 @@ def run_portfolio_top_n_gainers_ai_analysis(portfolio, start_day=None, end_day=N
                             # maybe refactor inside of a try statement no need for _fetch_data()
                             buy_or_not_analysis = should_I_buy_the_stock_google_gemini_pro(ticker, company_name, location, add_technical=True) # f"Is it a good time to buy {company_name}?"
                             rating = extract_investment_recommendation(buy_or_not_analysis, ticker) # , tokens_used # rating = float(re.findall(r"[0-9]{1,2}" + "S[out of 10|on a scale of 1-10]", buy_or_not_analysis.content)[0].split()[0]) if re.findall(r"[0-9]{1,2}" + " out of 10", buy_or_not_analysis.content) else float("NaN")
-                            rating = rating if rating else extract_investment_recommendation_2(buy_or_not_analysis, ticker)
+                            # rating = rating if rating else extract_investment_recommendation_2(buy_or_not_analysis, ticker)
                             print(ticker + ": " + str(rating))
                             if (ticker not in portfolio['open'].index) and (rating >= UP_MOVE): # care if ticker has just turned to buy # convenient since if 'Zacks Rank' is None conditional expression returns False instead of returning an error and continues, much faster
                                 print(ticker + ": " + " buying")
