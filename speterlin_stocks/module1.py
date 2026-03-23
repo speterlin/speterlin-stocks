@@ -1910,7 +1910,7 @@ def retry_atrade_error_or_paper_orders_in_portfolio(portfolio, df_matching_open_
     return portfolio
 
 def portfolio_check_for_stock_splits(portfolio):
-    df_stock_splits = stocks.get_tickers_with_stock_splits_fmp(start_day=datetime.now())
+    df_stock_splits = get_tickers_with_stock_splits_fmp(start_day=datetime.now())
     for ticker in portfolio['open'].index: # taking into account 'Not Filled' and 'Partially filled' (open orders) and 'ATrade Error' positions # [portfolio['open']['trade_notes'].isin(["Filled", "~Filled", None])]
         stock_split_idxs = df_stock_splits[df_stock_splits['symbol']==ticker].index.tolist() #
         if stock_split_idxs:
