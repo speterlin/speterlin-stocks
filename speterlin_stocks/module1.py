@@ -934,6 +934,7 @@ def update_portfolio_postions_back_testing(portfolio, stop_day, end_day, **param
             print("Error retreiving granular or 1d market data FMP for ticker: " + ticker + " on date: " + stop_day.strftime('%Y-%m-%d')) # error message should be covered in method
             portfolio['open'].loc[ticker, 'other_notes'] = "MDI " +  stop_day.strftime('%Y-%m-%d') # MDI stands for Market Data Issue
         else:
+            # no need to change balance here like in #portfolio_check_for_stock_splits since bringing price to original price and comparing it rather than bringing price to new price
             if tickers_with_stock_splits['apply_corrections'] and (ticker in tickers_with_stock_splits['stock_splits']['symbol'].values) and not (math.isclose(ticker_data_granular.iloc[-1]['close'], ticker_data.iloc[-1]['close'], rel_tol=0.20)): # and (ticker not in tickers_with_stock_splits['avoid_splitting']) # ticker in tickers_with_stock_splits: # and (stop_day.date() < tickers_with_stock_splits[ticker]['ex_date'].date()) # and (ticker not in tickers_to_avoid_splitting) add back if Yahoo Finance decides to update (hourly price data to match past daily price data) some tickers and not others # because yahoo finance api updates past daily price data but not hourly price data following a stock split, maybe refactor if notice a change, assuming for now that it remains this way
                 # if not ticker_data.empty and not (math.isclose(ticker_data_granular.iloc[-1]['close'], ticker_data.iloc[-1]['close'], rel_tol=0.20)):
                 divide_factor, prev_split_ratio, prev_ex_date, only_last_split, df_stock_splits = 1, float("NaN"), None, tickers_with_stock_splits['only_last_split'], tickers_with_stock_splits['stock_splits'] # prev_ex_date etc logic to prevent double splitting (splits on the first not the second) on FMP errors (planned and executed duplicates most likely not in that order but logically)
@@ -1909,6 +1910,7 @@ def retry_atrade_error_or_paper_orders_in_portfolio(portfolio, df_matching_open_
             portfolio['sold'].loc[idx, ['sell_date', 'sell_price', 'roi', 'trade_notes', 'other_notes']] = [datetime.now(), price, roi, trade_notes, "Retried order-e"] # maybe refactor price to sell_price
     return portfolio
 
+# not using this method in #update_portfolio_postions_back_testing because logic is already in place and processing is similar (calling or passing in #get_tickers_with_stock_splits_fmp and checking each portfolio ticker vs. checking to see if ticker_data_granular ticker is in passed #get_tickers_with_stock_splits_fmp and prices differ) and might run into errors with a ticker that has multiple splits
 def portfolio_check_for_stock_splits(portfolio):
     df_stock_splits = get_tickers_with_stock_splits_fmp(start_day=datetime.now())
     for ticker in portfolio['open'].index: # taking into account 'Not Filled' and 'Partially filled' (open orders) and 'ATrade Error' positions # [portfolio['open']['trade_notes'].isin(["Filled", "~Filled", None])]
@@ -1916,8 +1918,8 @@ def portfolio_check_for_stock_splits(portfolio):
         if stock_split_idxs:
             idx = stock_split_idxs[-1] # assuming a stock ticker doesn't split more than once in a day and using last split only
             split_ratio = df_stock_splits.loc[idx, 'denominator'] / df_stock_splits.loc[idx, 'numerator']
-            print("Correcting buy price and maybe tsl max price for ticker: " + ticker + " with split ratio: " + str(split_ratio) + " on stock split idx: " + str(idx))
-            portfolio['open'].loc[ticker, 'buy_price'] = portfolio['open'].loc[ticker, 'buy_price'] * split_ratio
+            print("Correcting buy price and balance and maybe tsl max price for ticker: " + ticker + " with split ratio: " + str(split_ratio) + " on stock split idx: " + str(idx))
+            portfolio['open'].loc[ticker, ['buy_price', 'balance']] = [portfolio['open'].loc[ticker, 'buy_price'] * split_ratio, portfolio['open'].loc[ticker, 'balance'] / split_ratio] # fractional shares allowed with stock splits
             portfolio['open'].loc[ticker, 'tsl_max_price'] = (portfolio['open'].loc[ticker, 'tsl_max_price'] * split_ratio) if portfolio['open'].loc[ticker, 'tsl_armed'] else portfolio['open'].loc[ticker, 'tsl_max_price']
             portfolio['open'].loc[ticker, 'other_notes'] = 'Stock Split correction ' + datetime.now().strftime('%Y-%m-%d')
     # Not taking into account outlier cases (unlikely that a ticker remains in 'Not filled' and has a stock split next market day: for ticker in portfolio['sold'][portfolio['sold']['trade_notes'].isin(["Not Filled"])].index: #
