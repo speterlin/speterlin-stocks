@@ -325,10 +325,11 @@ def get_tickers_with_stock_splits_fmp(start_day): # check tickers with tickers_w
                 repeated_idx = matching_rows.index[-1]
                 tickers_with_stock_splits = tickers_with_stock_splits.drop(repeated_idx)
                 skip_idxs.append(repeated_idx)
-    for ticker, dates in {'MMAT': {'date-incorrect': '2024-01-29', 'date-correct': '2024-01-26'}, 'KAVL': {'date-incorrect': '2024-01-25', 'date-correct': '2024-01-24'}}.items():
-        idx = tickers_with_stock_splits[(tickers_with_stock_splits['symbol']==ticker) & (tickers_with_stock_splits['date']==dates['date-incorrect'])].index.tolist()
-        print(ticker + ", " + str(idx) + ": Correcting incorrect date")
-        tickers_with_stock_splits.loc[idx, ['date', 'label']] = [dates['date-correct'], datetime.strptime(dates['date-correct'], '%Y-%m-%d').strftime('%B %d, %y')]
+    if not tickers_with_stock_splits.empty:
+        for ticker, dates in {'MMAT': {'date-incorrect': '2024-01-29', 'date-correct': '2024-01-26'}, 'KAVL': {'date-incorrect': '2024-01-25', 'date-correct': '2024-01-24'}}.items(): # need to refactor since might be more tickers with date-incorrect
+            idx = tickers_with_stock_splits[(tickers_with_stock_splits['symbol']==ticker) & (tickers_with_stock_splits['date']==dates['date-incorrect'])].index.tolist()
+            print(ticker + ", " + str(idx) + ": Correcting incorrect date")
+            tickers_with_stock_splits.loc[idx, ['date', 'label']] = [dates['date-correct'], datetime.strptime(dates['date-correct'], '%Y-%m-%d').strftime('%B %d, %y')]
     return tickers_with_stock_splits
 
 # note some tickers are returned different than normal ie 'BRK.B' is returned 'BRK-B'
@@ -1912,7 +1913,7 @@ def retry_atrade_error_or_paper_orders_in_portfolio(portfolio, df_matching_open_
 
 # not using this method in #update_portfolio_postions_back_testing because logic is already in place and processing is similar (calling or passing in #get_tickers_with_stock_splits_fmp and checking each portfolio ticker vs. checking to see if ticker_data_granular ticker is in passed #get_tickers_with_stock_splits_fmp and prices differ) and might run into errors with a ticker that has multiple splits
 def portfolio_check_for_stock_splits(portfolio):
-    df_stock_splits = get_tickers_with_stock_splits_fmp(start_day=datetime.now())
+    df_stock_splits = get_tickers_with_stock_splits_fmp(start_day=datetime.now()) # _fetch_data(, params={'start_day': datetime.now()}, error_str=" - No tickers with stock splits from FMP on: " + str(datetime.now()), empty_data = pd.DataFrame(columns=["symbol"])) # maybe add _fetch_data call on #get_tickers_with_stock_splits_fmp here since error for no stock splits on 2026-04-03, resolved above in #get_tickers_with_stock_splits_fmp
     for ticker in portfolio['open'].index: # taking into account 'Not Filled' and 'Partially filled' (open orders) and 'ATrade Error' positions # [portfolio['open']['trade_notes'].isin(["Filled", "~Filled", None])]
         stock_split_idxs = df_stock_splits[df_stock_splits['symbol']==ticker].index.tolist() #
         if stock_split_idxs:
