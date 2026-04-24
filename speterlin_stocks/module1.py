@@ -865,6 +865,8 @@ def alpaca_trade_ticker(ticker, side, usd_invest=None, quantity=None, price=None
     if not (usd_invest or quantity): # or (quantity and not (quantity % int(quantity) == 0)) # using this implementation instead of: isinstance(quantity, int) since balance often comes in as 21.0 or 10.0 which according to isinstance is not an integer when it should pass as an integer/whole number # on alpaca (and on exchanges in general) can't buy fractions of shares (unless a brokerage breaks up shares and sells) in contrast to Binance (and crypto exchanges in general) but let "ATrade Error"
         raise ValueError("usd_invest or quantity required") #  and if quantity specified must be an integer
     last_trade_data = _fetch_data(alpaca_api.get_latest_trade, params={'symbol': ticker}, error_str=" - No last trade from Alpaca for ticker: " + ticker + " on: " + str(datetime.now()), empty_data = {})
+    if not last_trade_data:
+        return [0, 0, {}, [], "TBD - Alpaca Not Tradable"]
     price = price if price else last_trade_data.price if last_trade_data else float("NaN") # price if price since possible price could change (mainly concerned with increase) in time between fetching price before and in alpaca_trade_ticker() and necessary to prevent quantity=0 error # float("NaN") so will throw error in alpaca_api.submit_order
     quantity = quantity if quantity else float("NaN") if np.isnan(price) else math.floor(usd_invest / price) if usd_invest > 10 else math.ceil(usd_invest / price) # not checking if price > usd_invest (resulting in fractions of a ticker) since would have to return "ATrade Error" which would lead to more logic downstream, easier to check before calling this function, also if it happens quantity = 0 and "ATrade Error" would occur # have to worry about insufficient USD available if round up (also good to be conservative with rounding down) and minimum order amounts if round down (unsure if this amount is correct for minimum trade amount, 0.001 for BTC on most exchanges which is ~$10 as of July 11 2020)
     if paper_trading:
@@ -1002,21 +1004,22 @@ def update_portfolio_postions_back_testing(portfolio, stop_day, end_day, **param
 # Can't trade ADR|ADS or Warrants on Alpaca, potentially refactor add case insensitive and whole word matching
 def get_tickers_to_avoid_in_alpaca(df_usa_alpaca_tickers_of_the_day): # usa_alpaca_tickers_end_with_y_with_no_current_alpaca_trade_data
     # print("running get_tickers_to_avoid_in_alpaca()")
-    adr_ads_warrant_tickers = {}
+    adr_ads_warrant_other_tickers = {}
     if (not type(df_usa_alpaca_tickers_of_the_day) is pd.core.frame.DataFrame) or df_usa_alpaca_tickers_of_the_day.empty:
         print("Must pass a non-empty dataframe as parameter")
         return {}
     tickers_end_with_y = df_usa_alpaca_tickers_of_the_day[df_usa_alpaca_tickers_of_the_day.index.str.endswith("Y")] # tickers_end_with_y_not_refleced_on_alpaca, tickers_end_with_y_reflected_on_alpaca, count = {}, [], 0
     for ticker in tickers_end_with_y.index:
         if re.search(r"(ADR|ADS|American\s(?:Depositary|Depository)\s(?:Receipt|Share)s?)", df_usa_alpaca_tickers_of_the_day.loc[ticker, 'Name (Alpaca)']): # chatgpt regex recommendation # last_word_of_alpaca_name = df_usa_alpaca_tickers_of_the_day.loc[ticker, 'Name (Alpaca)'].split(" ")[-1] # if last_word_of_alpaca_name == 'Warrant' or last_word_of_alpaca_name == 'Warrants':
-            adr_ads_warrant_tickers[ticker] = {'reason': "Can't trade ADR|ADS tickers on Alpaca", 'good_after_date': datetime.strptime('2029_06_06 13:00:00', '%Y_%m_%d %H:%M:%S')} # 2029 is some arbitrary date in future # tickers_end_with_y_not_refleced_on_alpaca.append(ticker)
+            adr_ads_warrant_other_tickers[ticker] = {'reason': "Can't trade ADR|ADS tickers on Alpaca", 'good_after_date': datetime.strptime('2029_06_06 13:00:00', '%Y_%m_%d %H:%M:%S')} # 2029 is some arbitrary date in future # tickers_end_with_y_not_refleced_on_alpaca.append(ticker)
         # else: # print(ticker + ": " + df_usa_alpaca_tickers_of_the_day.loc[ticker, 'Name (Alpaca)'])
     tickers_end_with_w = df_usa_alpaca_tickers_of_the_day[df_usa_alpaca_tickers_of_the_day.index.str.endswith("W")]
     for ticker in tickers_end_with_w.index:
         if re.search(r"Warrant", df_usa_alpaca_tickers_of_the_day.loc[ticker, 'Name (Alpaca)']): # last_word_of_alpaca_name = df_usa_alpaca_tickers_of_the_day.loc[ticker, 'Name (Alpaca)'].split(" ")[-1] # if last_word_of_alpaca_name == 'Warrant' or last_word_of_alpaca_name == 'Warrants':
-            adr_ads_warrant_tickers[ticker] = {'reason': "Can't trade Warrant tickers on Alpaca", 'good_after_date': datetime.strptime('2029_06_06 13:00:00', '%Y_%m_%d %H:%M:%S')}
+            adr_ads_warrant_other_tickers[ticker] = {'reason': "Can't trade Warrant tickers on Alpaca", 'good_after_date': datetime.strptime('2029_06_06 13:00:00', '%Y_%m_%d %H:%M:%S')}
         # else: # print(ticker + ": " + df_usa_alpaca_tickers_of_the_day.loc[ticker, 'Name (Alpaca)'])
-    return adr_ads_warrant_tickers # [, tickers_end_with_y_reflected_on_alpaca]
+    adr_ads_warrant_other_tickers = {**adr_ads_warrant_other_tickers, **{key: {'reason': "Can't trade other end in y tickers on Alpaca", 'good_after_date': datetime.strptime('2029_06_06 13:00:00', '%Y_%m_%d %H:%M:%S')} for key in ['IFNNY']}}
+    return adr_ads_warrant_other_tickers # [, tickers_end_with_y_reflected_on_alpaca]
 
 def get_tickers_to_avoid(df_usa_alpaca_tickers_of_the_day, end_day): # probably refactor
     if (not type(end_day) is datetime):
