@@ -90,10 +90,10 @@ __all__ = [
     "senate_timestamps_and_tickers_inflows_and_outflows_by_month_for_stocks",
     "run_portfolio_senate_trading",
     "run_portfolio_sma_mm",
-    "portfolio_align_prices_with_alpaca",
+    "portfolio_align_prices_and_balances_with_alpaca",
     "portfolio_align_buying_power_with_alpaca",
     "portfolio_calculate_roi",
-    "sleep_until_30_min",
+    "sleep_until_minute_mark_within_hour",
     "portfolio_panic_sell",
     "retry_alpaca_open_orders_in_portfolio",
     "retry_atrade_error_or_paper_orders_in_portfolio",
@@ -1766,32 +1766,34 @@ def run_portfolio_sma_mm(portfolio, start_day=None, end_day=None, sma_mm_sell=Tr
     return portfolio
 
 # function required for markets with high traffic volume / trading on multiple exchanges, refactor (so that buy positions of closed orders is included) or refactor frequency of calls if implement higher frequency trading (expect buying and selling within 1 hour)
-def portfolio_align_prices_with_alpaca(portfolio, open_positions=True, sold_positions=False): # no need to add: , avoid_paper_positions=False since if ticker shows up in positions or closed_orders they are real trades and thereby implicitly avoiding paper trades # not changing portfolio['balance']['usd'] since change is very small and
+def portfolio_align_prices_and_balances_with_alpaca(portfolio, open_positions=True, sold_positions=False): # no need to add: , avoid_paper_positions=False since if ticker shows up in positions or closed_orders they are real trades and thereby implicitly avoiding paper trades # not changing portfolio['balance']['usd'] since change is very small and
     if open_positions:
         positions = _fetch_data(alpaca_api.list_positions, params={}, error_str=" - Alpaca positions error on: " + str(datetime.now()), empty_data=[]) # show nested multi-leg orders # limit=100,
         for position in positions: # and not (avoid_paper_positions and (portfolio['open'].loc[ticker, 'position'] == 'long-p'))
-            ticker, buy_price_actual = position.symbol, float(position.avg_entry_price)
-            df_matching_open_positions = portfolio['open'][(portfolio['open'].index == ticker) & (portfolio['open']['trade_notes'].isin(["Filled", "~Filled"])) & (portfolio['open']['buy_price'] != buy_price_actual)] # not checking for 'position' == 'long' since if ticker in portfolio then the position must be 'long' (since is listed on alpaca as a position) and is unique in portfolio['open'] # including "~Filled" since in all cases (haven't found a case contrary) "~Filled" == "Filled"
+            ticker, buy_price_actual, quantity_actual = position.symbol, float(position.avg_entry_price), float(position.qty)
+            df_matching_open_positions = portfolio['open'][(portfolio['open'].index == ticker) & (portfolio['open']['trade_notes'].isin(["Filled", "~Filled"])) & ((portfolio['open']['buy_price'] != buy_price_actual) | (portfolio['open']['balance'] != quantity_actual))] # not checking for 'position' == 'long' since if ticker in portfolio then the position must be 'long' (since is listed on alpaca as a position) and is unique in portfolio['open'] # including "~Filled" since in all cases (haven't found a case contrary) "~Filled" == "Filled"
             if not df_matching_open_positions.empty: # maybe refactor here and below and add precautionary check - shouldn't have to check len() == 1 since symbol, like ticker (index) should be unique in portfolio['open']
                 buy_price, balance = portfolio['open'].loc[ticker, ['buy_price', 'balance']]
                 portfolio['balance']['usd'] = portfolio['balance']['usd'] - (buy_price_actual - buy_price)*balance # usually correction is a mattter of dollars but putting here and below in function to be consistent with other functions (anytime there is a position buy/sell/rebuy/resell/price correction) update portfolio['balance']['usd'], portfolio_align_buying_power_with_alpaca() always called before this method # actual: 11/9 bought: 10 balance: 50 -> 50,-50
-                portfolio['open'].loc[ticker, 'buy_price'] = buy_price_actual # maybe refactor - not changing current_roi since not necessary and don't want to have accidental (shouldn't happen but possible if I implement something new without thinking of this issue) sell trigger before start of next day
+                if portfolio['open'].loc[ticker, 'tsl_max_price'] and (portfolio['open'].loc[ticker, 'tsl_max_price'] / buy_price_actual >= (1+portfolio['constants']['tsl_a'])): # correcting potential FMP stock split errors
+                    portfolio['open'].loc[ticker, ['tsl_armed', 'tsl_max_price']] = False, float("NaN")
+                portfolio['open'].loc[ticker, ['buy_price', 'balance']] = buy_price_actual, quantity_actual # maybe refactor - not changing current_roi since not necessary and don't want to have accidental (shouldn't happen but possible if I implement something new without thinking of this issue) sell trigger before start of next day
     if sold_positions:
         closed_orders = _fetch_data(alpaca_api.list_orders, params={'status': 'closed', 'limit': 150, 'nested': True}, error_str=" - Alpaca closed orders error on: " + str(datetime.now()), empty_data=[])
         for closed_order in closed_orders:
             if (closed_order.status == 'filled') and (closed_order.side == 'sell'):
                 ticker, order_time, quantity = closed_order.symbol, datetime.fromtimestamp(datetime.timestamp(closed_order.created_at)), float(closed_order.qty) # here and below can also use closed_order.submitted_at (which is about a hundreth of a second before closed_order.created_at), better to use created_at I think since closer to input date in portfolio (datetime is recorded after order submitted) and higher up in Alpaca Order() object, and also maybe possible if submitted and not created, and need Alpaca Order() created # assuming that an order that is partially/not filled can't be closed (i.e. if original quantity was 12 and only 8/0 were executed then this order is not closed)
-                df_matching_sold_positions = portfolio['sold'][(portfolio['sold']['position'] == 'long') & (portfolio['sold']['ticker'] == ticker) & (portfolio['sold']['balance'] == quantity) & (portfolio['sold']['trade_notes'].isin(["Filled", "~Filled"])) & (portfolio['sold']['sell_date'] <= order_time + timedelta(minutes=10)) & (portfolio['sold']['sell_date'] >= order_time - timedelta(minutes=10))] # maybe refactor here and below 10 minutes, depends on frequency of selling and manual selling, also quantity -  assuming that two of same tickers which are sold at nearly the same time (usually due to PDT error) have different quantities - can maybe refactor for other_notes to include something like 'ATrade Error/PDT' for now balance should work most cases
+                df_matching_sold_positions = portfolio['sold'][(portfolio['sold']['position'] == 'long') & (portfolio['sold']['ticker'] == ticker) & (portfolio['sold']['trade_notes'].isin(["Filled", "~Filled"])) & (portfolio['sold']['sell_date'] <= order_time + timedelta(minutes=10)) & (portfolio['sold']['sell_date'] >= order_time - timedelta(minutes=10))] # & (portfolio['sold']['balance'] == quantity) # maybe refactor here and below 10 minutes, depends on frequency of selling and manual selling, also quantity -  assuming that two of same tickers which are sold at nearly the same time (usually due to PDT error) have different quantities - can maybe refactor for other_notes to include something like 'ATrade Error/PDT' for now balance should work most cases
                 if not df_matching_sold_positions.empty:
                     if len(df_matching_sold_positions) > 1: # maybe refactor
                         print("Error with ticker: " + ticker + " sold on " + str(order_time))
                         continue
-                    idx, sell_price_actual = df_matching_sold_positions.index[0], float(closed_order.filled_avg_price)
-                    if portfolio['sold'].loc[idx, 'sell_price'] != sell_price_actual: # maybe refactor - assuming that buy_price is accurately set in previous for loop before we encounter an issue like this
+                    idx, sell_price_actual, quantity_actual = df_matching_sold_positions.index[0], float(closed_order.filled_avg_price), float(closed_order.filled_qty)
+                    if (portfolio['sold'].loc[idx, 'sell_price'] != sell_price_actual) or (portfolio['sold'].loc[idx, 'balance'] != quantity_actual): # maybe refactor - assuming that buy_price is accurately set in previous for loop before we encounter an issue like this
                         buy_price, sell_price, balance = portfolio['sold'].loc[idx, ['buy_price', 'sell_price', 'balance']]
                         roi_actual = (sell_price_actual - buy_price) / buy_price
-                        portfolio['balance']['usd'] = portfolio['balance']['usd'] - (sell_price - sell_price_actual)*balance # sold: 10 actual: 11/9 balance: 50 -> -50,50
-                        portfolio['sold'].loc[idx, ['sell_price', 'roi']] = [sell_price_actual, roi_actual]
+                        portfolio['balance']['usd'] = portfolio['balance']['usd'] - (sell_price - sell_price_actual)*quantity_actual # balance # assuming qunatity_actual is correct balance # sold: 10 actual: 11/9 balance: 50 -> -50,50
+                        portfolio['sold'].loc[idx, ['sell_price', 'balance', 'roi']] = [sell_price_actual, quantity_actual, roi_actual]
     print("portfolio aligned prices with alpaca")
     return portfolio
 
@@ -1825,8 +1827,11 @@ def portfolio_calculate_roi(portfolio, open_positions=True, sold_positions=False
     else:
         return float("NaN")
 
-def sleep_until_30_min(paper_trading, paper_trading_on_used_account, portfolio_usd_value_negative_change_from_max_limit, portfolio_current_roi_restart, download_and_save_tickers_data): # maybe refactor to allow for different sleeping times (i.e. 30, 60 min) # maybe refactor name to sleep_until_30_min_while_trading() # , buying_disabled
-    time_to_sleep = (30.0 - datetime.now(eastern).minute) if (datetime.now(eastern).minute < 30) else (60.0 - datetime.now(eastern).minute) # max((60.0 - datetime.now(eastern).minute) % 30.0, 1) # maybe refactor logic (make simpler)
+def sleep_until_minute_mark_within_hour(minutes=30.0, paper_trading, paper_trading_on_used_account, portfolio_usd_value_negative_change_from_max_limit, portfolio_current_roi_restart, download_and_save_tickers_data): # maybe refactor to allow for different sleeping times (i.e. 30, 60 min) # maybe refactor name to sleep_until_minute_mark_within_hour_while_trading() # , buying_disabled
+    if not (0 <= minutes <= 60.0):
+        print("Error minutes should be within 1 hour")
+        return
+    time_to_sleep = (minutes - datetime.now(eastern).minute) if (datetime.now(eastern).minute < minutes) else (60.0 - datetime.now(eastern).minute) # max((60.0 - datetime.now(eastern).minute) % 30.0, 1) # maybe refactor logic (make simpler)
     print("<< Sleeping " + str(time_to_sleep) + "min at " + str(datetime.now()) + ", paper trading: " + str(paper_trading) + ", paper trading on used account: " + str(paper_trading_on_used_account) + ", portfolio usd value (-)change from max limit: " + str(portfolio_usd_value_negative_change_from_max_limit) + ", portfolio current roi restart: " + str(portfolio_current_roi_restart) + ", download and save tickers data: " + str(download_and_save_tickers_data) + " >>") #  + ", buying disabled: " + str(buying_disabled) # maybe add back to shorten: str(datetime.now())[:19]) - should always be [:19] unless in ~8000 years or if timing format changes
     time.sleep(time_to_sleep*60.0) # not needed 30*60.0 - *60) # turning into seconds
 
@@ -1922,10 +1927,11 @@ def portfolio_check_for_stock_splits(portfolio):
             stock_split_idxs = df_stock_splits[df_stock_splits['symbol']==ticker].index.tolist() #
             if stock_split_idxs:
                 idx = stock_split_idxs[-1] # assuming a stock ticker doesn't split more than once in a day and using last split only
+                if portfolio['open'].loc[ticker, 'other_notes'] == 'Stock Split correction ' + (datetime.now()-timedelta(days=1)).strftime('%Y-%m-%d'): # correcting for FMP double like CVNA on 2026-05-07&08
+                    continue
                 split_ratio = df_stock_splits.loc[idx, 'denominator'] / df_stock_splits.loc[idx, 'numerator']
                 print("Correcting buy price and balance and maybe tsl max price for ticker: " + ticker + " with split ratio: " + str(split_ratio) + " on stock split idx: " + str(idx))
-                portfolio['open'].loc[ticker, ['buy_price', 'balance']] = [portfolio['open'].loc[ticker, 'buy_price'] * split_ratio, portfolio['open'].loc[ticker, 'balance'] / split_ratio] # fractional shares allowed with stock splits
-                portfolio['open'].loc[ticker, 'tsl_max_price'] = (portfolio['open'].loc[ticker, 'tsl_max_price'] * split_ratio) if portfolio['open'].loc[ticker, 'tsl_armed'] else portfolio['open'].loc[ticker, 'tsl_max_price']
+                portfolio['open'].loc[ticker, ['buy_price', 'balance', 'tsl_max_price']] = [portfolio['open'].loc[ticker, 'buy_price'] * split_ratio, portfolio['open'].loc[ticker, 'balance'] / split_ratio, portfolio['open'].loc[ticker, 'tsl_max_price'] * split_ratio] # fractional shares allowed with stock splits
                 portfolio['open'].loc[ticker, 'other_notes'] = 'Stock Split correction ' + datetime.now().strftime('%Y-%m-%d')
         # Not taking into account outlier cases (unlikely that a ticker remains in 'Not filled' and has a stock split next market day: for ticker in portfolio['sold'][portfolio['sold']['trade_notes'].isin(["Not Filled"])].index: #
     return portfolio
@@ -1944,7 +1950,7 @@ def portfolio_trading(portfolio, paper_trading=True, paper_trading_on_used_accou
                 twilio_message = _fetch_data(twilio_client.messages.create, params={'to': twilio_phone_to, 'from_': twilio_phone_from, 'body': "Q Trading @stocks #" + portfolio_account + ": running on " + str(datetime.now()) + " :)"}, error_str=" - Twilio msg error to: " + twilio_phone_to + " on: " + str(datetime.now()), empty_data=None)
                 save_portfolio_backup(portfolio, remove_old_portfolio=True, usa_holidays=usa_holidays) # (True if ((datetime.now(eastern).hour == 9) and (datetime.now(eastern).minute >= 30) and (datetime.now(eastern).minute < 34)) else False) # maybe refactor, saving and removing here so don't have to add extra logic for checking time, remove old portfolio at start of next trading day (right before) since risky if delete after saving ticker data at end of day
             if ((datetime.now(eastern).hour == 16) and (datetime.now(eastern).minute < 4)): # check at end of day so sell prices are set in case want to do some analysis on portfolio after trading hours same day and buy prices are set for ATrade Errors/Open Orders executed after 15:41 EST
-                portfolio = portfolio_align_prices_with_alpaca(portfolio=portfolio, open_positions=True, sold_positions=True)
+                portfolio = portfolio_align_prices_and_balances_with_alpaca(portfolio=portfolio, open_positions=True, sold_positions=True)
                 save_portfolio_backup(portfolio)
             if (datetime.now(eastern).hour >= 21) and not portfolio_has_run: #  and (datetime.now(eastern).hour < 22) # and (datetime.now(eastern).minute < 4) # datetime.now(eastern).hour >= 21 # maybe refactor - since robinhood/firstrade afterhours extensd until 6pm/8pm EST, don't run at 8pm EST since crypto downloads at 8pm (EST)/5pm (PST), Alpaca: afterhours is 4-6pm EST but risky due to less liquidity, 6-8pm EST on a market day, the order request is returned with error. Alpaca reserves this time window for future expansion of supported hours. order is submitted after 8pm EST but before 9am EST of the following trading day, the order request is queued and will be eligible for execution from the beginning of the next available supported pre-market hours at 9am EST # issue if try to restart between 0:00 and 9:00 EST
                 todays_date = datetime.now() # no need to change to 13:00:00 time since fmp calls take the date in simple string format (no %H:%M:%S): datetime_object.strftime('%Y-%m-%d')
@@ -1954,7 +1960,7 @@ def portfolio_trading(portfolio, paper_trading=True, paper_trading_on_used_accou
                 else:
                     # df_tickers_interval_today = get_saved_tickers_data(date=todays_date.strftime('%Y-%m-%d'))
                     while df_tickers_interval_today.empty:
-                        sleep_until_30_min(paper_trading=paper_trading, paper_trading_on_used_account=paper_trading_on_used_account, portfolio_usd_value_negative_change_from_max_limit=portfolio_usd_value_negative_change_from_max_limit, portfolio_current_roi_restart=portfolio_current_roi_restart, download_and_save_tickers_data=download_and_save_tickers_data) # , buying_disabled=buying_disabled
+                        sleep_until_minute_mark_within_hour(paper_trading=paper_trading, paper_trading_on_used_account=paper_trading_on_used_account, portfolio_usd_value_negative_change_from_max_limit=portfolio_usd_value_negative_change_from_max_limit, portfolio_current_roi_restart=portfolio_current_roi_restart, download_and_save_tickers_data=download_and_save_tickers_data) # , buying_disabled=buying_disabled
                         if todays_date.hour <= (datetime.now() - timedelta(hours=11)).hour: # implemented so that if no market data doesn't stop program from running normally # maybe refactor, 11 hours since if running on Friday next if statement might run on Saturday if data is not downloaded until 6am Saturday morning
                             break
                         df_tickers_interval_today = get_saved_tickers_data(date=todays_date.strftime('%Y-%m-%d'))
@@ -1968,7 +1974,7 @@ def portfolio_trading(portfolio, paper_trading=True, paper_trading_on_used_accou
             if (datetime.now(eastern).hour >= 9) and (datetime.now(eastern).hour < 16): # stocks: maybe refactor to get total time in seconds (from beginning of day) instead of like this, so can be more exact (i.e. start at 9:30am EST so no beforehours) # no afterhours trading since risky due to less liquidity, doesn't reflect normal market conditions # maybe refactor bug if run on Friday and data not downloaded until
                 if (datetime.now(eastern).hour == 9) and (datetime.now(eastern).minute < 30): # probably refactor and add check for stocks splits before market open, minor issue for now
                     portfolio = portfolio_check_for_stock_splits(portfolio)
-                    sleep_until_30_min(paper_trading=paper_trading, paper_trading_on_used_account=paper_trading_on_used_account, portfolio_usd_value_negative_change_from_max_limit=portfolio_usd_value_negative_change_from_max_limit, portfolio_current_roi_restart=portfolio_current_roi_restart, download_and_save_tickers_data=download_and_save_tickers_data) # maybe refactor, quick (and cheap in terms of processing power / logic) fix to avoid trading/using prices from less liquid beforehours trading
+                    sleep_until_minute_mark_within_hour(minutes=34.0, paper_trading=paper_trading, paper_trading_on_used_account=paper_trading_on_used_account, portfolio_usd_value_negative_change_from_max_limit=portfolio_usd_value_negative_change_from_max_limit, portfolio_current_roi_restart=portfolio_current_roi_restart, download_and_save_tickers_data=download_and_save_tickers_data) # 34min since stock splits aren't registered until 4min after open according to CVNA 2026-05-08 # maybe refactor, quick (and cheap in terms of processing power / logic) fix to avoid trading/using prices from less liquid beforehours trading
                 print("<< " + str(datetime.now()) + ", paper trading: " + str(paper_trading) + ", paper trading on used account: " + str(paper_trading_on_used_account) + ", portfolio usd value (-)change from max limit: " + str(portfolio_usd_value_negative_change_from_max_limit) + ", portfolio current roi restart: " + str(portfolio_current_roi_restart) + ", download and save tickers data: " + str(download_and_save_tickers_data) + " >>") #  + ", buying disabled: " + str(buying_disabled)
                 start_time = time.time()
                 if portfolio['constants']['type'] == 'sma_mm':
@@ -2056,7 +2062,7 @@ def portfolio_trading(portfolio, paper_trading=True, paper_trading_on_used_accou
                             df_matching_positive_current_roi_paper_open_positions = portfolio['open'][(portfolio['open']['position'] == 'long-p') & (portfolio['open']['current_roi'] > 0)].sort_values('current_roi', inplace=False, ascending=False) # maybe refactor (to assets closest to 0 current_roi) - want to buy the most positive roi positions first (the relatively cheapest)
                             portfolio = portfolio_align_buying_power_with_alpaca(portfolio=portfolio, alpaca_account=account) # checking again for account since possible retry_alpaca_open_orders_in_portfolio() or retry_atrade_error_or_paper_orders_in_portfolio() executed orders and assets are altered
                             portfolio = retry_atrade_error_or_paper_orders_in_portfolio(portfolio=portfolio, df_matching_open_positions=df_matching_positive_current_roi_paper_open_positions, df_matching_sold_positions=pd.DataFrame(), paper_trading=paper_trading, atrade_error_or_paper_order_price_difference_limit=10) # atrade_error_or_paper_order_price_difference_limit=10 so that there is no upper limit
-                    portfolio = portfolio_align_prices_with_alpaca(portfolio=portfolio, open_positions=True, sold_positions=True)
+                    portfolio = portfolio_align_prices_and_balances_with_alpaca(portfolio=portfolio, open_positions=True, sold_positions=True)
                 print(str(portfolio['open'].drop(['fmp_24h_vol', 'gtrends_15d', 'rank_rise_d', 'tsl_armed', 'tsl_max_price', 'trade_notes', 'other_notes'], axis=1)) + "\n" + str(portfolio['open'].drop(['position', 'buy_date', 'buy_price', 'balance', 'current_date', 'current_price', 'current_roi'], axis=1)) + \
                     "\nCurrent ROI (Real): " + str(portfolio_calculate_roi(portfolio, avoid_paper_positions=True)) + "\nCurrent ROI (All): " + str(portfolio_calculate_roi(portfolio)) + "\nExecution time: " + str(time.time() - start_time) + "\n" + \
                     (str(portfolio['sold'].tail(40).drop(['fmp_24h_vol', 'rank_rise_d', 'tsl_max_price', 'gtrends_15d'], axis=1)) + \
@@ -2065,9 +2071,9 @@ def portfolio_trading(portfolio, paper_trading=True, paper_trading_on_used_accou
                 save_portfolio_backup(portfolio)
                 time.sleep(sleep_interval_during_market_hours - ((time.time() - start_time) % sleep_interval_during_market_hours)) # every 4 minutes since algorithms are low latency and don't want to use up excess computing power especially if running alongside crypto
             else: # business day market closed hours
-                sleep_until_30_min(paper_trading=paper_trading, paper_trading_on_used_account=paper_trading_on_used_account, portfolio_usd_value_negative_change_from_max_limit=portfolio_usd_value_negative_change_from_max_limit, portfolio_current_roi_restart=portfolio_current_roi_restart, download_and_save_tickers_data=download_and_save_tickers_data) # , buying_disabled=buying_disabled
+                sleep_until_minute_mark_within_hour(paper_trading=paper_trading, paper_trading_on_used_account=paper_trading_on_used_account, portfolio_usd_value_negative_change_from_max_limit=portfolio_usd_value_negative_change_from_max_limit, portfolio_current_roi_restart=portfolio_current_roi_restart, download_and_save_tickers_data=download_and_save_tickers_data) # , buying_disabled=buying_disabled
         else: # non-business days, # maybe refactor to 1 hour
-            sleep_until_30_min(paper_trading=paper_trading, paper_trading_on_used_account=paper_trading_on_used_account, portfolio_usd_value_negative_change_from_max_limit=portfolio_usd_value_negative_change_from_max_limit, portfolio_current_roi_restart=portfolio_current_roi_restart, download_and_save_tickers_data=download_and_save_tickers_data) # , buying_disabled=buying_disabled
+            sleep_until_minute_mark_within_hour(paper_trading=paper_trading, paper_trading_on_used_account=paper_trading_on_used_account, portfolio_usd_value_negative_change_from_max_limit=portfolio_usd_value_negative_change_from_max_limit, portfolio_current_roi_restart=portfolio_current_roi_restart, download_and_save_tickers_data=download_and_save_tickers_data) # , buying_disabled=buying_disabled
 
 # as of 09/28/2020 changed portfolio_constants naming of file from (example) 100_100_15 to 100_-100_15
 def save_portfolio_backup(portfolio, remove_old_portfolio=False, date=None, **params): # can add logic for different types of portfolio i.e. rr with different kinds of parameters i.e. different up and down moves
