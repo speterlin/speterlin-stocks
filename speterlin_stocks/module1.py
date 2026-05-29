@@ -85,8 +85,8 @@ __all__ = [
     "run_portfolio_mmtv",
     "run_portfolio_random_sp500",
     "run_portfolio_mm",
-    "run_portfolio_ai_recommendations_in_sector",
-    "run_portfolio_top_n_gainers_ai_analysis",
+    "run_portfolio_airs",
+    "run_portfolio_tngaia",
     "senate_timestamps_and_tickers_inflows_and_outflows_by_month_for_stocks",
     "run_portfolio_senate_trading",
     "run_portfolio_sma_mm",
@@ -1119,9 +1119,9 @@ def run_portfolio(portfolio, **params): # call portfolio = run_portfolio(portfol
     elif portfolio['constants']['type'] == 'mm':
         portfolio = run_portfolio_mm(portfolio, **params)
     elif portfolio['constants']['type'] == 'airs':
-        portfolio = run_portfolio_ai_recommendations_in_sector(portfolio, **params)
+        portfolio = run_portfolio_airs(portfolio, **params)
     elif portfolio['constants']['type'] == 'tngaia':
-        portfolio = run_portfolio_top_n_gainers_ai_analysis(portfolio, **params)
+        portfolio = run_portfolio_tngaia(portfolio, **params)
     elif portfolio['constants']['type'] == 'senate_trading':
         portfolio = run_portfolio_senate_trading(portfolio, **params)
     elif portfolio['constants']['type'] == 'sma_mm':
@@ -1488,8 +1488,8 @@ def run_portfolio_mm(portfolio, start_day=None, end_day=None, paper_trading=True
             stop_day = stop_day + timedelta(days=1)
     return portfolio
 
-def run_portfolio_ai_recommendations_in_sector(portfolio, start_day=None, end_day=None, airs_sell=True, paper_trading=True, back_testing=False, limit_tickers=23, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 180, 'tickers': 50, 'days': 1000}, **params): # keep **params here and in run_portfolio_rr() so can pass variables for backtesting cases in which the yahoo finance service is down but the data for start_day and end_day is already loaded
-    print("running run_portfolio_ai_recommendations_in_sector()")
+def run_portfolio_airs(portfolio, start_day=None, end_day=None, airs_sell=True, paper_trading=True, back_testing=False, limit_tickers=23, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 180, 'tickers': 50, 'days': 1000}, **params): # keep **params here and in run_portfolio_rr() so can pass variables for backtesting cases in which the yahoo finance service is down but the data for start_day and end_day is already loaded
+    print("running run_portfolio_airs()")
     if (not type(portfolio['constants']['up_down_move']) is list) or len(portfolio['constants']['up_down_move']) != 3:
         print("Error up/down move constant is not a list or a list with length 3")
         return portfolio
@@ -1546,8 +1546,8 @@ def run_portfolio_ai_recommendations_in_sector(portfolio, start_day=None, end_da
             stop_day = stop_day + timedelta(days=1)
     return portfolio
 
-def run_portfolio_top_n_gainers_ai_analysis(portfolio, start_day=None, end_day=None, tngaia_sell=True, paper_trading=True, back_testing=False, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 180, 'tickers': 50, 'days': 1000}, **params): # keep **params here and in run_portfolio_rr() so can pass variables for backtesting cases in which the yahoo finance service is down but the data for start_day and end_day is already loaded # unsure why I put this here: back_running_allowance=11
-    print("running run_portfolio_top_n_gainers_ai_analysis()")
+def run_portfolio_tngaia(portfolio, start_day=None, end_day=None, tngaia_sell=True, paper_trading=True, back_testing=False, add_pauses_to_avoid_unsolved_error={'engaged': False, 'time': 180, 'tickers': 50, 'days': 1000}, **params): # keep **params here and in run_portfolio_rr() so can pass variables for backtesting cases in which the yahoo finance service is down but the data for start_day and end_day is already loaded # unsure why I put this here: back_running_allowance=11
+    print("running run_portfolio_tngaia()")
     if (not type(portfolio['constants']['up_down_move']) is list) or len(portfolio['constants']['up_down_move']) != 2:
         print("Error up/down move constant is not a list or a list with length 2")
         return portfolio
@@ -1798,7 +1798,7 @@ def portfolio_align_prices_and_balances_with_alpaca(portfolio, open_positions=Tr
     return portfolio
 
 # Since Alpaca adjusts Account day trading buying power at their discretion. This will normally be based upon the Alpaca's risk assessment of the stocks volatility and liquidity (I think for example if buy risky stock will have less buying power in case risky stock gets out of money and don't have enough collateral to cover)
-def portfolio_align_buying_power_with_alpaca(portfolio, alpaca_account): # maybe refactor name to portfolio_align_balance_with_alpaca # maybe refactor to add fail safe for if alpaca_account comes in as {}
+def portfolio_align_buying_power_with_alpaca(portfolio, alpaca_account): # maybe refactor to add fail safe for if alpaca_account comes in as {}
     available_cash = float(alpaca_account.buying_power) # maybe refactor fluctuates in non-market hours (potentially afterhours market) and might have to do with margin alpaca_account and also during market hours (back and forth to same number on 08/17/2020 11am-1pm PST)
     if not (math.isclose(available_cash, portfolio['balance']['usd'], rel_tol=0.20) and (portfolio['balance']['usd'] <= available_cash)): # maybe refactor and check for balance locked # quick fix to keep portfolio['balance']['usd'] accurate and conservative since alpaca_account.buying_power fluctuating (think due to margin alpaca_account)
         portfolio_balance_usd_previous, portfolio['balance']['usd'] = portfolio['balance']['usd'], available_cash # here and other locations keep _usd_ in name even though default (value/price) is in usd as precautionary (for iuportant cases) also so don't get confused with % return in other cases ie. decreased_return vs. decreased_usd_return
@@ -1926,9 +1926,10 @@ def portfolio_check_for_stock_splits(portfolio):
         for ticker in portfolio['open'].index: # taking into account 'Not Filled' and 'Partially filled' (open orders) and 'ATrade Error' positions # [portfolio['open']['trade_notes'].isin(["Filled", "~Filled", None])]
             stock_split_idxs = df_stock_splits[df_stock_splits['symbol']==ticker].index.tolist() #
             if stock_split_idxs:
-                idx = stock_split_idxs[-1] # assuming a stock ticker doesn't split more than once in a day and using last split only
-                if portfolio['open'].loc[ticker, 'other_notes'] == 'Stock Split correction ' + (datetime.now()-timedelta(days=1)).strftime('%Y-%m-%d'): # correcting for FMP double like CVNA on 2026-05-07&08
+                if portfolio['open'].loc[ticker, 'other_notes'] == 'Stock Split correction ' + (datetime.now()-timedelta(days=1)).strftime('%Y-%m-%d'): # correcting for FMP duplicate like CVNA on 2026-05-07&08 # not taking into account weekends and holiday previous day issue since rare problem not worth extra logic
+                    portfolio['open'].loc[ticker, 'other_notes'] = 'Stock Split correction ' + datetime.now().strftime('%Y-%m-%d') # assume stock split ratio is same as previous day (FMP just got the date 1 day early)
                     continue
+                idx = stock_split_idxs[-1] # assuming a stock ticker doesn't split more than once in a day and using last split only
                 split_ratio = df_stock_splits.loc[idx, 'denominator'] / df_stock_splits.loc[idx, 'numerator']
                 print("Correcting buy price and balance and maybe tsl max price for ticker: " + ticker + " with split ratio: " + str(split_ratio) + " on stock split idx: " + str(idx))
                 portfolio['open'].loc[ticker, ['buy_price', 'balance', 'tsl_max_price']] = [portfolio['open'].loc[ticker, 'buy_price'] * split_ratio, portfolio['open'].loc[ticker, 'balance'] / split_ratio, portfolio['open'].loc[ticker, 'tsl_max_price'] * split_ratio] # fractional shares allowed with stock splits
@@ -1975,6 +1976,7 @@ def portfolio_trading(portfolio, paper_trading=True, paper_trading_on_used_accou
                 if (datetime.now(eastern).hour == 9) and (datetime.now(eastern).minute < 30): # probably refactor and add check for stocks splits before market open, minor issue for now
                     portfolio = portfolio_check_for_stock_splits(portfolio)
                     sleep_until_minute_mark_within_hour(paper_trading=paper_trading, paper_trading_on_used_account=paper_trading_on_used_account, portfolio_usd_value_negative_change_from_max_limit=portfolio_usd_value_negative_change_from_max_limit, portfolio_current_roi_restart=portfolio_current_roi_restart, download_and_save_tickers_data=download_and_save_tickers_data, minutes=34.0) # 34min since stock splits aren't registered until 4min after open according to CVNA 2026-05-08 # maybe refactor, quick (and cheap in terms of processing power / logic) fix to avoid trading/using prices from less liquid beforehours trading
+                    portfolio = portfolio_align_prices_and_balances_with_alpaca(portfolio=portfolio) if not paper_trading else portfolio # in case a stock split not reflected on Alpaca, maybe refactor in reality this alone would work for paper_trading=False but for paper_trading=True (especially if want different brokerage interactions) would need #portfolio_check_for_stock_splits # maybe refactor add check for rare case - stock split for open order / atrade positions
                 print("<< " + str(datetime.now()) + ", paper trading: " + str(paper_trading) + ", paper trading on used account: " + str(paper_trading_on_used_account) + ", portfolio usd value (-)change from max limit: " + str(portfolio_usd_value_negative_change_from_max_limit) + ", portfolio current roi restart: " + str(portfolio_current_roi_restart) + ", download and save tickers data: " + str(download_and_save_tickers_data) + " >>") #  + ", buying disabled: " + str(buying_disabled)
                 start_time = time.time()
                 if portfolio['constants']['type'] == 'sma_mm':
