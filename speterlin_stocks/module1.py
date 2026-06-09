@@ -1163,7 +1163,7 @@ def run_portfolio_fmpr(portfolio, start_day=None, end_day=None, fmpr_sell=True, 
     UP_MOVE, DOWN_MOVE = portfolio['constants']['up_down_move'], -portfolio['constants']['up_down_move'] # maybe refactor and add similar to up_down_move with difference between start day's zacks rank and stop day's zacks rank,
     success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
     if success_or_error == "Error":
-        print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio, returning")
+        print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio(), returning")
         return portfolio
     while stop_day.date() <= end_day.date():
         if not (portfolio['open']['current_date'] >= stop_day).any(): # in case re-run existing portfolio over same days to avoid back running (and conserve time): avoid selling existing tickers incorrectly to TSL (too early) due to tsl_max_price set on future day or selling/buying existing/new tickers incorrectly with algorithm logic # assuming datetime is always in 13:00:00
@@ -1210,7 +1210,7 @@ def run_portfolio_rr(portfolio, start_day=None, end_day=None, rr_sell=True, pape
     UP_MOVE, DOWN_MOVE = portfolio['constants']['up_down_move'], -portfolio['constants']['up_down_move']
     success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
     if success_or_error == "Error":
-        print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio, returning")
+        print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio(), returning")
         return portfolio
     while stop_day.date() <= end_day.date():
         if not (portfolio['open']['current_date'] >= stop_day).any(): # in case re-run existing portfolio over same days to avoid back running (and conserve time): avoid selling existing tickers incorrectly to TSL (too early) due to tsl_max_price set on future day or selling/buying existing/new tickers incorrectly with algorithm logic # assuming datetime is always in 13:00:00
@@ -1262,7 +1262,7 @@ def run_portfolio_tilupccu(portfolio, start_day=None, end_day=None, paper_tradin
     DAYS = portfolio['constants']['days']
     success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
     if success_or_error == "Error":
-        print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio, returning")
+        print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio(), returning")
         return portfolio
     while stop_day.date() <= end_day.date():
         if not (portfolio['open']['current_date'] >= stop_day).any(): # in case re-run existing portfolio over same days to avoid back running (and conserve time): avoid selling existing tickers incorrectly to TSL (too early) due to tsl_max_price set on future day or selling/buying existing/new tickers incorrectly with algorithm logic # assuming datetime is always in 13:00:00
@@ -1325,7 +1325,7 @@ def run_portfolio_mmtv(portfolio, start_day=None, end_day=None, mmtv_sell=True, 
     # UP_MOVE, DOWN_MOVE = portfolio['constants']['up_down_move'], -portfolio['constants']['up_down_move']
     success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
     if success_or_error == "Error":
-        print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio, returning")
+        print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio(), returning")
         return portfolio
     while stop_day.date() <= end_day.date():
         if not (portfolio['open']['current_date'] >= stop_day).any(): # in case re-run existing portfolio over same days to avoid back running (and conserve time): avoid selling existing tickers incorrectly to TSL (too early) due to tsl_max_price set on future day or selling/buying existing/new tickers incorrectly with algorithm logic # assuming datetime is always in 13:00:00
@@ -1385,7 +1385,7 @@ def run_portfolio_random_sp500(portfolio, start_day=None, end_day=None, random_s
         return portfolio
     success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
     if success_or_error == "Error":
-        print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio, returning")
+        print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio(), returning")
         return portfolio
     # refactor repeat below,
     df_tickers_interval_stop = get_saved_tickers_data(date=stop_day.strftime('%Y-%m-%d'))
@@ -1450,7 +1450,7 @@ def run_portfolio_mm(portfolio, start_day=None, end_day=None, paper_trading=True
     # UP_MOVE = portfolio['constants']['up_down_move'] # , DOWN_MOVE , -portfolio['constants']['up_down_move']
     success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
     if success_or_error == "Error":
-        print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio, returning")
+        print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio(), returning")
         return portfolio
     while stop_day.date() <= end_day.date():
         if not (portfolio['open']['current_date'] >= stop_day).any(): # in case re-run existing portfolio over same days to avoid back running (and conserve time): avoid selling existing tickers incorrectly to TSL (too early) due to tsl_max_price set on future day or selling/buying existing/new tickers incorrectly with algorithm logic # assuming datetime is always in 13:00:00
@@ -1499,7 +1499,7 @@ def run_portfolio_airs(portfolio, start_day=None, end_day=None, airs_sell=True, 
         return portfolio
     success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
     if success_or_error == "Error":
-        print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio, returning")
+        print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio(), returning")
         return portfolio
     ticker_count = 0
     while stop_day.date() <= end_day.date():
@@ -1557,7 +1557,7 @@ def run_portfolio_tngaia(portfolio, start_day=None, end_day=None, tngaia_sell=Tr
         return portfolio
     success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
     if success_or_error == "Error":
-        print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio, returning")
+        print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio(), returning")
         return portfolio
     while stop_day.date() <= end_day.date():
         if not (portfolio['open']['current_date'] >= stop_day).any(): # in case re-run existing portfolio over same days to avoid back running (and conserve time): avoid selling existing tickers incorrectly to TSL (too early) due to tsl_max_price set on future day or selling/buying existing/new tickers incorrectly with algorithm logic # assuming datetime is always in 13:00:00
@@ -1637,7 +1637,7 @@ def run_portfolio_senate_trading(portfolio, start_day=None, end_day=None, senate
             return portfolio
     success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, back_testing, **params)
     if success_or_error == "Error":
-        print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio, returning")
+        print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio(), returning")
         return portfolio
     tickers_to_buy_or_sell_every_month = {}
     for timestamp_and_ticker in senate_timestamps_and_tickers_inflows_and_outflows[senate_timestamps_and_tickers_inflows_and_outflows['rank'] < RANK_LIMIT].index:
@@ -1687,7 +1687,7 @@ def run_portfolio_sma_mm(portfolio, start_day=None, end_day=None, sma_mm_sell=Tr
         return portfolio
     success_or_error, portfolio, DAYS, end_day, start_day, stop_day, tickers_with_stock_splits, count, usa_holidays = check_for_basic_errors_and_set_general_params_for_run_portfolio(portfolio, start_day, end_day, paper_trading, False, **params)
     if success_or_error == "Error":
-        print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio, returning")
+        print("Error in check_for_basic_errors_and_set_general_params_for_run_portfolio(), returning")
         return portfolio
     if stop_day.hour > 18: # assuming only called / running on market days / weekdays
         tickers_to_sell = []
