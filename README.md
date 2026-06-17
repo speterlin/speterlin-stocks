@@ -34,6 +34,16 @@ assets = stocks.get_alpaca_assets(alpaca_account=account, alpaca_open_orders=alp
 print(str(assets) + "\nTotal Current Value: " + str(assets['current_value'].sum()) + "\nAccount Equity: " + str(account.equity) + "\nAccount Buying Power: " + str(account.buying_power))
 ```
 
+## Check for mismatch between Portfolio Open Positions and Assets
+
+```python
+# View assets (disregard USD, which is buying power) that are not in real open positions
+list(set(assets.index.values) - set(portfolio['open'][(portfolio['open']['trade_notes'].isin(["Filled", "~Filled"]))].index.values))
+
+# View real open positions that are not in assets
+list(set(portfolio['open'][(portfolio['open']['trade_notes'].isin(["Filled", "~Filled"]))].index.values) - set(assets.index.values))
+```
+
 ## Market calls
 
 ```python
@@ -55,7 +65,7 @@ ticker = 'GOOGL'
 ticker_data_detailed = stocks._fetch_data(stocks.get_ticker_data_detailed_fmp, params={'ticker': ticker}, error_str=" - No ticker data detailed FMP for ticker: " + ticker + " on: " + str(datetime.now()), empty_data={})
 ```
 
-## Get and save (in quant-trading directory ~data/stocks/saved_tickers_data/usa_alpaca_by_yf_and_fmp_or_gf) all of Alpaca's USA tickers data today (takes roughly 2-3 hours to save - for FMP data - or ~4 hours to save - for Google Finance data):
+## Get and save (in quant-trading directory ~data/stocks/saved_tickers_data/usa_alpaca_by_yf_and_fmp_or_gf) all of Alpaca's USA tickers (~6000 active tickers) data today (takes roughly 2-3 hours to save - for FMP data - or ~4 hours to save - for Google Finance data):
 
 ```python
 todays_date = datetime.now()
