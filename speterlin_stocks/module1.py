@@ -62,8 +62,7 @@ __all__ = [
     "get_google_trends_pt", # replaces "get_cryptory",
     "get_saved_tickers_data",
     # "save_usa_tv_tickers_zacks_data",
-    "save_tickers_yf_and_fmp_or_gf_data",
-    "save_tickers_daily_gainers_or_losers_fmp",
+    "save_tickers_data",
     "save_usa_alpaca_tickers_fmp_or_gf_data",
     # "get_crunchbase_search_permalinks",
     # "get_crunchbase_permalink_site_check_ticker",
@@ -624,7 +623,7 @@ def get_google_trends_pt(kw_list, from_date, to_date, trend_days=270, cat=0, geo
 def get_saved_tickers_data(date, category='all', rankings=['zr'], additions=[]): # date is a string in format '%Y-%m-%d', categories: 'sp500', 'usa_by_tv' # refactor rankings
     if category == 'all':
         category = 'sp500_by_sc' if datetime.strptime(date, '%Y-%m-%d').date() < datetime.strptime('2020-05-08', '%Y-%m-%d').date() else 'usa_by_tv' if datetime.strptime(date, '%Y-%m-%d').date() < datetime.strptime('2020-07-21', '%Y-%m-%d').date() else 'usa_alpaca_by_yf_and_fmp_or_gf' + ('_and_' + '_'.join(additions) if additions else '') # '2020-08-08' # maybe refactor names usa_by_tv and usa_alpaca_by_yf names
-        rankings = ['zr'] if datetime.strptime(date, '%Y-%m-%d').date() < datetime.strptime('2020-07-21', '%Y-%m-%d').date() else ['ms', 'zr'] # '2020-08-08' # ['ms'] if datetime.strptime(date, '%Y-%m-%d').date() <= datetime.strptime('2020-08-07', '%Y-%m-%d').date() else ['ms', 'zr'] # <= since '2020-08-07' is a Friday
+        rankings = ['zr'] if datetime.strptime(date, '%Y-%m-%d').date() < datetime.strptime('2020-07-21', '%Y-%m-%d').date() else ['ms', 'zr'] if datetime.strptime(date, '%Y-%m-%d').date() < datetime.strptime('2026-07-03', '%Y-%m-%d').date() else ['zr'] # '2020-08-08' # ['ms'] if datetime.strptime(date, '%Y-%m-%d').date() <= datetime.strptime('2020-08-07', '%Y-%m-%d').date() else ['ms', 'zr'] # <= since '2020-08-07' is a Friday
     try:
         f = open('data/stocks/saved_tickers_data/' + category + '/tickers_' + '_'.join(rankings + additions) + '_' + date + '.pckl', 'rb')
         df_tickers_historical = pd.read_pickle(f)
@@ -657,23 +656,18 @@ def save_usa_tv_tickers_zacks_data(date): # maybe refactor, only for companies a
     f.close()
     return df_usa_by_tv_tickers_zr
 
-def save_tickers_yf_and_fmp_or_gf_data(df_tickers, date, additions=[]): # date is in format '%Y-%m-%d' # ms_zr_
-    f = open('data/stocks/saved_tickers_data/' + 'usa_alpaca_by_yf_and_fmp_or_gf' + ('_and_' + '_'.join(additions) if additions else '') + '/tickers_' + '_'.join(['ms', 'zr'] + additions) + '_' + date + '.pckl', 'wb') # date instead of datetime.now() since process takes a while can extend into next day when data is not for the next day
-    pd.to_pickle(df_tickers, f)
-    f.close()
-
-def save_tickers_daily_gainers_or_losers_fmp(gainers_or_losers, df_tickers, date, additions=[]): # date is in format '%Y-%m-%d'
-    f = open('data/stocks/saved_tickers_data/' + 'usa_' + gainers_or_losers + '_fmp' + ('_and_' + '_'.join(additions) if additions else '') + '/tickers_' + '_'.join(additions) + '_' + date + '.pckl', 'wb') # date instead of datetime.now() since process takes a while can extend into next day when data is not for the next day
+def save_tickers_data(df_tickers, date, category='usa_alpaca_by_yf_and_fmp_or_gf', rankings=['zr'], additions=[]): # 'ms', # date is in format '%Y-%m-%d'
+    f = open('data/stocks/saved_tickers_data/' + category + ('_and_' + '_'.join(additions) if additions else '') + '/tickers_' + '_'.join(rankings + additions) + '_' + date + '.pckl', 'wb') # date instead of datetime.now() since process takes a while can extend into next day when data is not for the next day
     pd.to_pickle(df_tickers, f)
     f.close()
 
 def save_usa_alpaca_tickers_fmp_or_gf_data(date, fmp_paid_data=False): # maybe refactor and take away ms since not showing up most of time # date is in format '%Y-%m-%d'
-    df_usa_alpaca_tickers_fmp_or_gf_ms_zr_data = pd.DataFrame(columns = ['Name (Alpaca)', 'ID (Alpaca)', 'Exchange (Alpaca)', 'Shortable (Alpaca)', 'Easy to Borrow (Alpaca)', 'Class (Alpaca)', 'Asset Type', 'Market Cap', 'Sector', 'Industry', 'CEO', 'Website', '# Employees', 'Location', 'Last', 'Volume', 'P/E (TTM)', 'Forward P/E', 'P/S (TTM)', 'Basic EPS (FY)', 'Basic EPS (TTM)', 'PEG Ratio (TTM)', 'Div Yield (FY)', 'P/B (TTM)', 'EBITDA', 'EV/EBITDA (TTM)', 'D/E (TTM)', 'Net Income Ratio', 'Revenue (Past 5 years)', 'Gross Profit Ratio (Past 5 years)', 'Total Assets (Past 5 years)', 'Total Liabilities (Past 5 years)', 'Cash and Cash Equivalents (Past 5 years)', 'Long-Term Debt (Past 5 years)', 'Past 5 years', 'Beta', 'Short of Float Ratio', 'Short Ratio', 'Day range', 'Year range', '200D Avg', '50D Avg', 'Morningstar Rating', 'Held by Institutions Ratio', 'Held by Insiders Ratio', 'FMP Rank', 'FMP Rank Date', 'Zacks Rank', 'Zacks Updated At']).astype({'Name (Alpaca)': 'object', 'ID (Alpaca)': 'object', 'Exchange (Alpaca)': 'object', 'Shortable (Alpaca)': 'bool', 'Easy to Borrow (Alpaca)': 'bool', 'Class (Alpaca)': 'object', 'Asset Type': 'object', 'Market Cap': 'float64', 'Sector': 'object', 'Industry': 'object', 'CEO': 'object', 'Website': 'object', '# Employees': 'float64', 'Location': 'object', 'Last': 'float64', 'Volume': 'float64', 'P/E (TTM)': 'float64', 'Forward P/E': 'float64', 'P/S (TTM)': 'float64', 'Basic EPS (FY)': 'float64', 'Basic EPS (TTM)': 'float64', 'PEG Ratio (TTM)': 'float64', 'Div Yield (FY)': 'float64', 'P/B (TTM)': 'float64', 'EBITDA': 'float64', 'EV/EBITDA (TTM)': 'float64', 'D/E (TTM)': 'float64', 'Net Income Ratio': 'float64', 'Revenue (Past 5 years)': 'object', 'Gross Profit Ratio (Past 5 years)': 'object', 'Total Assets (Past 5 years)': 'object', 'Total Liabilities (Past 5 years)': 'object', 'Cash and Cash Equivalents (Past 5 years)': 'object', 'Long-Term Debt (Past 5 years)': 'object', 'Past 5 years': 'object', 'Beta': 'float64', 'Short of Float Ratio': 'float64', 'Short Ratio': 'float64', 'Day range': 'object', 'Year range': 'object', '200D Avg': 'float64', '50D Avg': 'float64', 'Morningstar Rating': 'float64', 'Held by Institutions Ratio': 'float64', 'Held by Insiders Ratio': 'float64', 'FMP Rank': 'float64', 'FMP Rank Date': 'datetime64[ns]', 'Zacks Rank': 'float64', 'Zacks Updated At': 'datetime64[ns]'}) # maybe refactor and add columns which measure other KPIs, like in save_usa_tv_tickers_zacks_data, "S&P 500 Rank"
+    df_usa_alpaca_tickers_fmp_or_gf_zr_data = pd.DataFrame(columns = ['Name (Alpaca)', 'ID (Alpaca)', 'Exchange (Alpaca)', 'Shortable (Alpaca)', 'Easy to Borrow (Alpaca)', 'Class (Alpaca)', 'Asset Type', 'Market Cap', 'Sector', 'Industry', 'CEO', 'Website', '# Employees', 'Location', 'Last', 'Volume', 'P/E (TTM)', 'Forward P/E', 'P/S (TTM)', 'Basic EPS (FY)', 'Basic EPS (TTM)', 'PEG Ratio (TTM)', 'Div Yield (FY)', 'P/B (TTM)', 'EBITDA', 'EV/EBITDA (TTM)', 'D/E (TTM)', 'Net Income Ratio', 'Revenue (Past 5 years)', 'Gross Profit Ratio (Past 5 years)', 'Total Assets (Past 5 years)', 'Total Liabilities (Past 5 years)', 'Cash and Cash Equivalents (Past 5 years)', 'Long-Term Debt (Past 5 years)', 'Past 5 years', 'Beta', 'Short of Float Ratio', 'Short Ratio', 'Day range', 'Year range', '200D Avg', '50D Avg', 'Morningstar Rating', 'Held by Institutions Ratio', 'Held by Insiders Ratio', 'FMP Rank', 'FMP Rank Date', 'Zacks Rank', 'Zacks Updated At']).astype({'Name (Alpaca)': 'object', 'ID (Alpaca)': 'object', 'Exchange (Alpaca)': 'object', 'Shortable (Alpaca)': 'bool', 'Easy to Borrow (Alpaca)': 'bool', 'Class (Alpaca)': 'object', 'Asset Type': 'object', 'Market Cap': 'float64', 'Sector': 'object', 'Industry': 'object', 'CEO': 'object', 'Website': 'object', '# Employees': 'float64', 'Location': 'object', 'Last': 'float64', 'Volume': 'float64', 'P/E (TTM)': 'float64', 'Forward P/E': 'float64', 'P/S (TTM)': 'float64', 'Basic EPS (FY)': 'float64', 'Basic EPS (TTM)': 'float64', 'PEG Ratio (TTM)': 'float64', 'Div Yield (FY)': 'float64', 'P/B (TTM)': 'float64', 'EBITDA': 'float64', 'EV/EBITDA (TTM)': 'float64', 'D/E (TTM)': 'float64', 'Net Income Ratio': 'float64', 'Revenue (Past 5 years)': 'object', 'Gross Profit Ratio (Past 5 years)': 'object', 'Total Assets (Past 5 years)': 'object', 'Total Liabilities (Past 5 years)': 'object', 'Cash and Cash Equivalents (Past 5 years)': 'object', 'Long-Term Debt (Past 5 years)': 'object', 'Past 5 years': 'object', 'Beta': 'float64', 'Short of Float Ratio': 'float64', 'Short Ratio': 'float64', 'Day range': 'object', 'Year range': 'object', '200D Avg': 'float64', '50D Avg': 'float64', 'Morningstar Rating': 'float64', 'Held by Institutions Ratio': 'float64', 'Held by Insiders Ratio': 'float64', 'FMP Rank': 'float64', 'FMP Rank Date': 'datetime64[ns]', 'Zacks Rank': 'float64', 'Zacks Updated At': 'datetime64[ns]'}) # maybe refactor and add columns which measure other KPIs, like in save_usa_tv_tickers_zacks_data, "S&P 500 Rank"
     count = 0
     exchange_rates_usd = _fetch_data(get_exchange_rates_exchangerate, params={'base_currency': 'USD'}, error_str=" - No Exchange Rates (USD) from ExchangeRate-api on: " + str(datetime.now()), empty_data = {})
     for asset in _fetch_data(alpaca_api.list_assets, params={'status': 'active'}, error_str=" - No listed assets from Alpaca on: " + str(datetime.now()), empty_data = []): # since only about 1/2-2/3 of alpaca assets are adequate (have market cap data), can use scrape to get adequate assets from a site that allows scraping # alpaca assets (organization / order in which listed) data changed on 2021-03-12, but possibly corrected on 2021-03-16
         ticker = asset.symbol # not using upper() as precautionary, should already be in upper
-        # if ticker in df_usa_alpaca_tickers_fmp_or_gf_ms_zr_data.index:
+        # if ticker in df_usa_alpaca_tickers_fmp_or_gf_zr_data.index:
         #     continue
         if asset.tradable == False: # maybe refactor and add asset.shortable == False, tradable same as as status
             continue
@@ -696,7 +690,7 @@ def save_usa_alpaca_tickers_fmp_or_gf_data(date, fmp_paid_data=False): # maybe r
                 # if None in [ticker_data_detailed['price']['marketCap'], ticker_data_detailed['price']['regularMarketPrice'], ticker_data_detailed['price']['regularMarketVolume'], ticker_data_detailed['defaultKeyStatistics']['trailingEps'], ticker_data_detailed['defaultKeyStatistics']['priceToBook']]:
                     # continue
                 # maybe add 'bid', 'sharesOutstanding', something regarding Sales/Revenue like ['defaultKeyStatistics']['enterpriseToRevenue'], something regarding ratings trend like ['recommendationTrend']['trend'], something regarding liquidity like current ratio, ['defaultKeyStatistics']['profitMargins'] # maybe take out 'eps' or 'p/e' one can be derived from the other and add (5 yr expected to PEG), 'ev/ebitda' since issue with ev value (compared to Yahoo Finance) # useful values from finance.yahoo.com/quote/' + ticker: '1y target EST', 'Earnings Date', 'Avg. Volume', "Day's Range", might be able to get more values like D/E and P/FCF in javascript section of page # not using Yahoo Finance EV since it is a quite a bit larger than TradingView
-                df_usa_alpaca_tickers_fmp_or_gf_ms_zr_data.loc[ticker] = [
+                df_usa_alpaca_tickers_fmp_or_gf_zr_data.loc[ticker] = [
                     asset.name,
                     asset.id,
                     asset.exchange,
@@ -752,7 +746,7 @@ def save_usa_alpaca_tickers_fmp_or_gf_data(date, fmp_paid_data=False): # maybe r
                 ticker_data_detailed = _fetch_data(get_ticker_data_detailed_gfinance, params={'ticker': ticker, 'exchange': exchange, 'exchange_rates_usd': exchange_rates_usd}, error_str=" - No ticker data detailed Google Finance for ticker: " + ticker + " on exchange: " + exchange + " on: " + str(datetime.now()), empty_data={})
                 if not ticker_data_detailed:
                     continue
-                df_usa_alpaca_tickers_fmp_or_gf_ms_zr_data.loc[ticker,
+                df_usa_alpaca_tickers_fmp_or_gf_zr_data.loc[ticker,
                     ['Name (Alpaca)', 'ID (Alpaca)', 'Exchange (Alpaca)', 'Shortable (Alpaca)', 'Easy to Borrow (Alpaca)', 'Class (Alpaca)', 'Market Cap', 'CEO', 'Website', '# Employees', 'Location', 'Last', 'Volume', 'P/E (TTM)', 'Basic EPS (TTM)', 'Div Yield (FY)', 'Day range', 'Year range', 'Zacks Rank', 'Zacks Updated At'] # maybe add regex search for words before 'conglomerate'|'holding company'|'company' to get 'Sector', 'Industry'
                 ] = [
                     asset.name, asset.id, asset.exchange, asset.shortable, asset.easy_to_borrow, asset.__getattr__('class'),
@@ -773,8 +767,8 @@ def save_usa_alpaca_tickers_fmp_or_gf_data(date, fmp_paid_data=False): # maybe r
                 ]
         except Exception as e:
             print(str(e) + " - No (or issue with) ticker data detailed " + ("FMP" if fmp_paid_data else "Google Finance") + " for ticker: " + ticker + " on exchange: " + asset.exchange + " on: " + str(datetime.now()) + ", Execution time: " + str(time.time() - start_time)) # or zacks data
-    save_tickers_yf_and_fmp_or_gf_data(df_usa_alpaca_tickers_fmp_or_gf_ms_zr_data, date)
-    return df_usa_alpaca_tickers_fmp_or_gf_ms_zr_data
+    save_tickers_data(df_usa_alpaca_tickers_fmp_or_gf_zr_data, date)
+    return df_usa_alpaca_tickers_fmp_or_gf_zr_data
 
 def get_crunchbase_search_permalinks(permalink, **params):
     # time.sleep(5) # since if return a long list (up to 25) will iterate over a long list will get json.decoder.JSONDecodeError: Expecting value: line 6 column 1 (char 5) error -> https://stackoverflow.com/questions/34579327/jsondecodeerror-expecting-value-line-1-column-1?rq=1
@@ -1275,7 +1269,7 @@ def run_portfolio_tilupccu(portfolio, start_day=None, end_day=None, paper_tradin
                 portfolio = update_portfolio_postions_back_testing(portfolio=portfolio, stop_day=stop_day, end_day=end_day, tickers_with_stock_splits=tickers_with_stock_splits) #
             if not back_testing:
                 df_tickers_daily_losers = _fetch_data(get_daily_stock_gainers_or_losers_fmp, params={'gainers_or_losers': 'losers'}, error_str=" - Issues with today's stock losers from FMP on: " + str(datetime.now()), empty_data = pd.DataFrame())
-                save_tickers_daily_gainers_or_losers_fmp("losers", df_tickers_daily_losers, stop_day.strftime('%Y-%m-%d'))
+                save_tickers_data(df_tickers_daily_losers, stop_day.strftime('%Y-%m-%d'), "usa_losers_fmp", rankings=[])
             if portfolio['balance']['usd'] >= portfolio['constants']['usd_invest_min']:
                 interval_start_date = stop_day - timedelta(days=DAYS)
                 while interval_start_date.weekday() > 4 or (interval_start_date.replace(hour=0, minute=0, second=0, microsecond=0) in usa_holidays): # only USA holidays for now since only working with tickers listed on USA exchanges # interval_start_date = interval_start_date if (interval_start_date.weekday() < 5) else (interval_start_date - timedelta(days=interval_start_date.weekday()-4)) # to avoid weekends and holidays, always go further back rather than forward (more conservative)
@@ -1569,7 +1563,7 @@ def run_portfolio_tngaia(portfolio, start_day=None, end_day=None, tngaia_sell=Tr
                 portfolio = update_portfolio_postions_back_testing(portfolio=portfolio, stop_day=stop_day, end_day=end_day, tickers_with_stock_splits=tickers_with_stock_splits) # maybe refactor throughout and make it function(param1, param2, ...) rather than function(param1=param1, param2=param2, ...)
             if not back_testing:
                 df_tickers_daily_gainers = _fetch_data(get_daily_stock_gainers_or_losers_fmp, params={}, error_str=" - Issues with today's stock gainers from FMP on: " + str(datetime.now()), empty_data = pd.DataFrame()) # shouldn't backtest this portfolio but if do on accident this should fail it
-                save_tickers_daily_gainers_or_losers_fmp("gainers", df_tickers_daily_gainers, stop_day.strftime('%Y-%m-%d'))
+                save_tickers_data(df_tickers_daily_gainers, stop_day.strftime('%Y-%m-%d'), "usa_gainers_fmp", rankings=[])
             if portfolio['balance']['usd'] >= portfolio['constants']['usd_invest_min']: # tngaia_sell or - unlikely that a top-n gainer from a new day is going to show up from a previous day and be rated as a sell
                 df_tickers_interval_stop = get_saved_tickers_data(date=stop_day.strftime('%Y-%m-%d'))
                 df_tickers_interval_stop = df_tickers_interval_stop[df_tickers_interval_stop['Market Cap'] > 0].sort_values('Market Cap', ascending=False, inplace=False)

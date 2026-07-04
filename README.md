@@ -1,6 +1,6 @@
 # speterlin-stocks
 
-A Python package for a suite of quant-trading opportunities in stocks with API integration: Alpaca brokerage for storing USD assets and margin trading (2x) on exchanges NYSE & NASDAQ, Financial Modeling Prep (FMP) & Google Trends & Yahoo Finance & Google Finance & Zacks & ExchangeRate & Slickcharts & CrunchBase for data collection, OpenAI & Google Gemini-Pro for AI analysis.
+A Python package for a suite of quant-trading opportunities in stocks with API integration: Alpaca brokerage for storing USD assets and margin trading (2-4x) on exchanges NYSE & NASDAQ, Financial Modeling Prep (FMP) & Google Trends & Yahoo Finance & Google Finance & Zacks & ExchangeRate & Slickcharts & CrunchBase for data collection, OpenAI & Google Gemini-Pro for AI analysis.
 
 Please see [quant-trading](https://github.com/speterlin/quant-trading) for writing scripts, backtesting, other analysis. Make sure to install package like this (with python>=3.12 and latest pip) in your environment or (recommended) virtual environment:
 ```python
@@ -75,12 +75,16 @@ stocks.save_usa_alpaca_tickers_fmp_or_gf_data(date=todays_date.strftime('%Y-%m-%
 stocks.save_usa_alpaca_tickers_fmp_or_gf_data(date=todays_date.strftime('%Y-%m-%d'))
 ```
 
-## Retrieve past saved (in directory above) FMP data (49 data points - it's what fits on a normal 13in labtop screen on regular terminal/bash/zsh/vim font)
+## Retrieve past saved (in directory above) FMP or Google Finance data (49 data points - it's what fits on a normal 13in labtop screen on regular terminal/bash/zsh/vim font)
 
 ```python
+# Saved FMP or Google Finance data
 df_tickers_2025_11_17 = stocks.get_saved_tickers_data(date='2025-11-17')
 # View the 49 saved data points on GOOGL
 df_tickers_2025_11_17.loc['GOOGL']
+
+# By specific category
+df_tickers_gainers_2026_06_30 = stocks.get_saved_tickers_data(date='2026-06-30', category='usa_gainers_fmp', rankings=[])
 ```
 
 ## Get todays other (Google Trends & Yahoo Finance & Google Finance & Zacks & ExchangeRate & Slickcharts & CrunchBase) data
@@ -93,7 +97,7 @@ import re
 import pandas as pd
 from fake_headers import Headers
 
-ticker, stop_day ='TSLA', datetime.now()
+ticker, stop_day = 'TSLA', datetime.now()
 
 # 15 days Google Trends of a Ticker
 google_trends = stocks._fetch_data(stocks.get_google_trends_pt, params={'kw_list': [ticker], 'from_date': stop_day - timedelta(days=15), 'to_date': stop_day}, error_str=" - No " + "google trends" \

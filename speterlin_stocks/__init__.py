@@ -1,10 +1,10 @@
-"""A Python package for a suite of quant-trading opportunities in stocks with API integration: Alpaca brokerage for storing USD assets and margin trading (2x) on exchanges NYSE & NASDAQ, Financial Modeling Prep (FMP) & Google Trends & Yahoo Finance & Google Finance & Zacks & ExchangeRate & Slickcharts & CrunchBase for data collection, OpenAI & Google Gemini-Pro for AI analysis.
+"""A Python package for a suite of quant-trading opportunities in stocks with API integration: Alpaca brokerage for storing USD assets and margin trading (2-4x) on exchanges NYSE & NASDAQ, Financial Modeling Prep (FMP) & Google Trends & Yahoo Finance & Google Finance & Zacks & ExchangeRate & Slickcharts & CrunchBase for data collection, OpenAI & Google Gemini-Pro for AI analysis.
 
 .. moduleauthor:: Sebastian B. Peterlin
 
 """
 
-__version__ = '1.6.0'
+__version__ = '1.6.6'
 
 # from .module1 import *
 # from . import module1
