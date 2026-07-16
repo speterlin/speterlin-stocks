@@ -186,7 +186,7 @@ portfolio_usd_value = portfolio['balance']['usd']
 for ticker in portfolio['open'].index:
     portfolio_usd_value += portfolio['open'].loc[ticker, 'current_price']*portfolio['open'].loc[ticker, 'balance']
 
-portfolio_usd_value_growth = (portfolio_usd_value - portfolio['constants']['start_balance']['usd']) / portfolio['constants']['start_balance']['usd']
+portfolio_usd_value_growth = (portfolio_usd_value - portfolio['constants']['start_balance']['usd']) / (portfolio['constants']['start_balance']['usd']) # *4, *4
 
 # INSPECT OUTCOME of single portfolio
 portfolio['sold'].sort_values('roi', inplace=False, ascending=False)[['ticker', 'buy_date', 'buy_price', 'balance', 'rank_rise_d', 'sell_date', 'sell_price', 'roi', 'other_notes']]
